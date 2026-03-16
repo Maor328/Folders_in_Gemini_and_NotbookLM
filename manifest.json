@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini & NotebookLM Folders",
+  "version": "1.0.0",
+  "description": "A browser extension for Gemini and NotebookLM that introduces a custom folder system to organize your chats and notebooks.",
+  "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://gemini.google.com/*",
+        "https://notebooklm.google.com/*"
+      ],
+      "js": ["content.js"],
+      "css": ["style.css"]
+    }
+  ]
+}
