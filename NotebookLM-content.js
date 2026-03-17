@@ -739,8 +739,9 @@ function openNotebookContextMenu(e, title, folderId) {
 // ---------------------------------------------------------------------------
 
 function injectFolderOptionIntoNativeMenu(menuContainer) {
-  // Idempotent — never inject twice into the same menu instance
-  if (menuContainer.querySelector(".nblm-folder-option")) return;
+  // Always clean up any previously injected item so we can re-evaluate
+  // the current state (Angular aggressively caches and reuses DOM nodes).
+  menuContainer.querySelector(".nblm-folder-option")?.remove();
 
   const anchorItem = menuContainer.querySelector(
     "button, li, [role='menuitem'], .mat-mdc-menu-item",
