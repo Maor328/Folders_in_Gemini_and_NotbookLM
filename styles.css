@@ -1,0 +1,501 @@
+/* ============================================================
+   Shared styles — Gemini Folders + NotebookLM Folders
+   Both content scripts use these shared component classes.
+   Site-specific rules are grouped at the bottom of each section.
+   ============================================================ */
+
+/* ============================================================
+   SHARED ANIMATED LISTS (folder chats + main folder list)
+   ============================================================ */
+
+.folder-chats,
+#folders-list,
+#nblm-folders-list {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition:
+    max-height 0.3s ease-in-out,
+    opacity 0.2s ease-in-out;
+}
+
+.folder-chats.open,
+#folders-list.open,
+#nblm-folders-list.open {
+  max-height: 2000px;
+  opacity: 1;
+}
+
+/* ============================================================
+   SHARED FOLDER ITEM ROW
+   ============================================================ */
+
+.custom-folder-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  gap: 8px;
+}
+
+.custom-folder-item:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.folder-name {
+  flex-grow: 1;
+  text-align: right;
+  font-size: 14px;
+  font-family: inherit !important;
+  color: #e3e3e3;
+}
+
+.folder-arrow-svg {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease;
+  color: #c4c7c5;
+}
+
+.custom-folder-item.is-open .folder-arrow-svg {
+  transform: rotate(180deg);
+}
+
+.pin-icon-svg {
+  display: none;
+  color: #a8c7fa;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+}
+
+.custom-folder-item.is-pinned .pin-icon-svg {
+  display: flex;
+}
+
+/* ⋮ buttons — hidden by default, revealed on row hover */
+.folder-menu-btn,
+.folder-chat-menu-btn {
+  opacity: 0;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  color: #888;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.custom-folder-item:hover .folder-menu-btn,
+.folder-chat-item:hover .folder-chat-menu-btn {
+  opacity: 0.7;
+}
+
+.folder-menu-btn:hover,
+.folder-chat-menu-btn:hover {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+  opacity: 1 !important;
+}
+
+/* ============================================================
+   SHARED CHAT / NOTEBOOK ITEM ROW (inside an open folder)
+   ============================================================ */
+
+.folder-chat-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 8px;
+  margin: 2px 0;
+  transition: background-color 0.2s;
+}
+
+.folder-chat-item:hover {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.chat-title-btn {
+  flex-grow: 1;
+  text-align: right;
+  font-size: 14px;
+  color: #e3e3e3;
+  cursor: pointer;
+}
+
+/* ============================================================
+   SHARED DROPDOWN MENU
+   ============================================================ */
+
+.folder-dropdown {
+  position: fixed;
+  background: #282a2c;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 8px 0;
+  z-index: 200000;
+  min-width: 180px;
+  max-height: 300px;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  font-family: "Google Sans", sans-serif !important;
+}
+
+.folder-dropdown-item {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  padding: 10px 16px;
+  cursor: pointer;
+  color: #e3e3e3;
+  font-size: 14px;
+  transition: background 0.2s;
+  gap: 12px;
+}
+
+.folder-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ============================================================
+   SHARED MODAL OVERLAY + MODAL CARD
+   ============================================================ */
+
+.folder-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999999;
+}
+
+.folder-modal {
+  background: #282a2c;
+  border-radius: 28px;
+  padding: 24px;
+  width: 320px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  font-family: "Google Sans", sans-serif;
+  direction: rtl;
+}
+
+.folder-modal input {
+  width: 100%;
+  background: transparent;
+  border: 1px solid #8e918f;
+  border-radius: 4px;
+  padding: 12px;
+  color: white;
+  font-size: 16px;
+  margin-bottom: 24px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.folder-modal input:focus {
+  border-color: #a8c7fa;
+  border-width: 2px;
+  padding: 11px;
+}
+
+.confirm-btn-blue {
+  background-color: #a8c7fa !important;
+  color: #062e6f !important;
+  border-radius: 20px;
+  padding: 10px 24px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.confirm-btn-blue:hover {
+  background-color: #c2d7ff !important;
+}
+
+.cancel-btn-plain {
+  background: none;
+  border: none;
+  color: #a8c7fa;
+  cursor: pointer;
+  font-weight: 500;
+  padding: 10px 24px;
+  border-radius: 20px;
+  transition: background 0.2s;
+}
+
+.cancel-btn-plain:hover {
+  background: rgba(168, 199, 250, 0.08);
+}
+
+/* ============================================================
+   GEMINI — site-specific rules
+   ============================================================ */
+
+#gemini-custom-folders {
+  padding: 12px 0;
+  margin: 8px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: "Google Sans", sans-serif !important;
+  direction: rtl;
+}
+
+#main-folders-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+  gap: 8px;
+}
+
+#main-folders-header:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+#main-folders-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #e3e3e3;
+  flex-grow: 0;
+  text-align: right;
+  white-space: nowrap;
+}
+
+#add-folder-btn {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #e3e3e3 !important;
+  cursor: pointer;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  padding: 0 12px;
+  font-family: "Google Sans", sans-serif;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  flex-grow: 1;
+  max-width: fit-content;
+  margin: 0 auto 0 0;
+  white-space: nowrap;
+}
+
+#add-folder-btn:hover {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+#main-folders-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease;
+  color: #c4c7c5;
+  margin-left: 0;
+}
+
+#main-folders-header.is-open #main-folders-arrow {
+  transform: rotate(180deg);
+}
+
+/* Notebook/chat hidden in sidebar — removed from the native list */
+.gemini-hidden-chat {
+  display: none !important;
+}
+
+/* Hides Google's native dropdown during programmatic Delete / Share actions.
+   Targets the menu panel directly — avoids the fragile :has() CSS selector. */
+body.gemini-action-in-progress .mat-mdc-menu-panel,
+body.gemini-action-in-progress .mat-menu-panel {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  display: none !important;
+}
+body.gemini-action-in-progress .cdk-overlay-backdrop {
+  pointer-events: none !important;
+  display: none !important;
+}
+
+/* Reveal element off-screen so Angular CDK can compute real (X,Y) coordinates
+   for Delete / Share dialogs while keeping it invisible to the user.
+   hideMovedChats() checks for this class to avoid re-hiding during the action. */
+.gemini-temp-reveal {
+  position: fixed !important;
+  top: -9999px !important;
+  left: -9999px !important;
+  visibility: hidden !important;
+  display: block !important;
+  pointer-events: none !important;
+}
+
+/* Purely a JS state marker for Rename — no display override needed.
+   Prevents hideMovedChats() from hiding the item while the rename input is open. */
+.gemini-renaming-chat {
+  outline: 2px solid rgba(168, 199, 250, 0.4);
+  border-radius: 8px;
+}
+
+/* Force RTL direction on Angular CDK overlays (Gemini uses CDK menus) */
+.cdk-overlay-container {
+  direction: rtl;
+}
+
+/* Ensure the native Gemini menu inherits our font */
+.mat-mdc-menu-content {
+  font-family: "Google Sans", sans-serif !important;
+}
+
+/* ============================================================
+   NOTEBOOKLM — site-specific rules
+   ============================================================ */
+
+/* Wrapper panel injected above the notebook table.
+   Matches NLM's own card style: dark surface, subtle border, rounded. */
+#nblm-custom-folders {
+  width: 50%;
+  max-width: 700px;
+  min-width: 320px;
+  box-sizing: border-box;
+  padding: 4px 0 8px;
+  margin: 0 auto 24px;
+  border-radius: 12px;
+  background: #1e2022;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: "Google Sans", sans-serif !important;
+  direction: rtl;
+}
+
+/* Panel header row */
+#nblm-folders-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 10px 16px;
+  cursor: pointer;
+  border-radius: 10px 10px 0 0;
+  transition: background-color 0.2s;
+  gap: 8px;
+}
+
+#nblm-folders-header:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Thin separator between header and open folder list */
+#nblm-folders-header.is-open {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+#nblm-folders-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: #e3e3e3;
+  flex-grow: 0;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* "Add folder" button */
+#nblm-add-folder-btn {
+  background-color: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e3e3e3 !important;
+  cursor: pointer;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 15px;
+  padding: 0 14px;
+  font-family: "Google Sans", sans-serif;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  flex-grow: 1;
+  max-width: fit-content;
+  margin: 0 auto 0 0;
+  white-space: nowrap;
+}
+
+#nblm-add-folder-btn:hover {
+  background-color: rgba(255, 255, 255, 0.13) !important;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+/* Chevron arrow that rotates when the panel is open */
+#nblm-folders-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease;
+  color: #c4c7c5;
+}
+
+#nblm-folders-header.is-open #nblm-folders-arrow {
+  transform: rotate(180deg);
+}
+
+/* Extra inner padding when the folder list is visible */
+#nblm-folders-list.open {
+  padding: 6px 8px 4px;
+}
+
+/* Notebook hidden from the main table/grid — it lives inside a folder */
+.nblm-hidden-notebook {
+  display: none !important;
+}
+
+/* Temporarily reveals a hidden table row off-screen so Angular CDK can
+   process programmatic clicks (same pattern as gemini-temp-reveal).
+   display:table-row is required for <tr> elements.
+   NOTE: No visibility:hidden or pointer-events:none — those block Angular
+   event processing. The element is invisible to users via position alone. */
+.nblm-temp-reveal {
+  position: fixed !important;
+  top: -9999px !important;
+  left: -9999px !important;
+  display: table-row !important;
+}
+
+/* "הוסף לתיקייה שלי" / "הסר מהתיקייה שלי" — injected into NLM's
+   native ⋮ menu. NLM renders its menu items as LTR flex rows even
+   when the content is Hebrew, so we match that layout (row, not
+   row-reverse) and use direction:rtl only on the text span. */
+.nblm-folder-option {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: "Google Sans", sans-serif;
+  color: inherit;
+  gap: 12px;
+  transition: background 0.15s;
+}
+
+.nblm-folder-option:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Folder-selection sub-menu must sit above NLM's own overlay stack */
+.folder-dropdown.nblm-top {
+  z-index: 2147483647 !important;
+}

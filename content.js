@@ -37,7 +37,14 @@ chrome.storage.local.get(["geminiFolders"], function (result) {
 });
 
 function saveFolders() {
-  chrome.storage.local.set({ geminiFolders: myFolders }, renderFolders);
+  // Render immediately (synchronous) so the UI updates without waiting
+  // for the async storage write to complete.
+  renderFolders();
+  try {
+    chrome.storage.local.set({ geminiFolders: myFolders });
+  } catch (e) {
+    if (!e.message?.includes("Extension context invalidated")) throw e;
+  }
 }
 
 function closeAllOverlays() {
@@ -182,6 +189,49 @@ function showDeleteFolderModal(folder) {
   });
 }
 
+function showRenameFolderModal(folder) {
+  closeAllOverlays();
+  const modal = document.createElement("div");
+  modal.className = "folder-modal-overlay";
+  modal.innerHTML = `
+        <div class="folder-modal">
+            <h2 style="color:white; margin:0 0 16px; font-size:24px; font-weight:400;">שינוי שם תיקייה:</h2>
+            <input type="text" id="rename-folder-input" autocomplete="off" spellcheck="false">
+            <div style="display:flex; flex-direction: row-reverse; gap:12px;">
+                <button class="confirm-btn-blue" id="confirm-rename-folder">אישור</button>
+                <button class="cancel-btn-plain" id="cancel-rename-folder">ביטול</button>
+            </div>
+        </div>`;
+  document.body.appendChild(modal);
+  overlays.createModal = modal;
+
+  const input = document.getElementById("rename-folder-input");
+  if (input) {
+    input.value = folder.name;
+    input.focus();
+    input.select();
+  }
+
+  const confirm = () => {
+    const newName = input?.value.trim();
+    if (newName && newName !== folder.name) {
+      folder.name = newName;
+      saveFolders();
+    }
+    closeAllOverlays();
+  };
+  document
+    .getElementById("confirm-rename-folder")
+    ?.addEventListener("click", confirm);
+  document
+    .getElementById("cancel-rename-folder")
+    ?.addEventListener("click", closeAllOverlays);
+  input?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") confirm();
+    if (e.key === "Escape") closeAllOverlays();
+  });
+}
+
 function showRenameChatModal(url, oldTitle) {
   closeAllOverlays();
   const modal = document.createElement("div");
@@ -290,6 +340,7 @@ function openFolderOptions(e, folder) {
 
   menu.innerHTML = `
         <div class="folder-dropdown-item" id="opt-pin"><span style="flex-grow:1; text-align:right;">${pinLabel}</span><svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="${pinIconPath}"/></svg></div>
+        <div class="folder-dropdown-item" id="opt-rename"><span style="flex-grow:1; text-align:right;">שינוי שם</span><svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></div>
         <div class="folder-dropdown-item" id="opt-delete"><span style="flex-grow:1; text-align:right;">מחק תיקייה</span><svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></div>
     `;
 
@@ -307,6 +358,10 @@ function openFolderOptions(e, folder) {
     folder.isPinned = !folder.isPinned;
     saveFolders();
     closeAllOverlays();
+  });
+  menu.querySelector("#opt-rename")?.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    showRenameFolderModal(folder);
   });
   menu.querySelector("#opt-delete")?.addEventListener("click", (ev) => {
     ev.stopPropagation();
@@ -655,8 +710,59 @@ function injectFoldersUI() {
 // (it is not a delete button — it is simply the first menu item used as
 //  an insertion anchor for our custom "Add/Remove from folder" option).
 function addFolderOptionToMenu(container, anchorItem) {
-  const isFromFolder = !!(lastContextChat && lastContextChat.fromFolder);
   if (!anchorItem) return;
+
+  const trigger = document.querySelector('[aria-expanded="true"]');
+  const triggerContainer = trigger ? trigger.closest(".navigation-item, li") : null;
+
+  let frozenUrl = "";
+  let frozenTitle = "";
+  let frozenFolder = null;
+
+  if (triggerContainer) {
+    // Strategy 1: The trigger is inside a sidebar item. Find its associated link.
+    const link = triggerContainer.querySelector(CHAT_LINK_SEL);
+    if (link && !link.closest("#gemini-custom-folders")) {
+      frozenUrl = chatPath(link.getAttribute("href"));
+      frozenTitle = link.textContent.trim();
+    } else if (lastContextChat?.url) {
+      // Fallback to hover state tracking
+      frozenUrl = lastContextChat.url;
+      frozenTitle = lastContextChat.title;
+    }
+  } else {
+    // Strategy 2: The trigger is NOT in the sidebar (e.g., top-left 3-dots menu).
+    // This menu applies to the currently active chat.
+    if (window.location.pathname.includes('/app/')) {
+      frozenUrl = chatPath(window.location.href);
+      // Try to find the title from the active sidebar item
+      const activeLinks = Array.from(document.querySelectorAll(CHAT_LINK_SEL));
+      const activeLink = activeLinks.find(a => !a.closest("#gemini-custom-folders") && chatPath(a.getAttribute("href")) === frozenUrl);
+      
+      if (activeLink) {
+        frozenTitle = activeLink.textContent.trim();
+      } else {
+        frozenTitle = document.title.replace(' - Gemini', '').trim() || "Current Chat";
+      }
+    } else if (lastContextChat?.url) {
+      frozenUrl = lastContextChat.url;
+      frozenTitle = lastContextChat.title;
+    }
+  }
+
+  // Recalculate folder membership in case strategy 2 or 3 found the URL,
+  // or lastContextChat was missing fromFolder
+  if (frozenUrl) {
+    let belongsTo = null;
+    myFolders.forEach((folder) => {
+      if (folder.chats.some((c) => chatPath(c.url) === frozenUrl)) {
+        belongsTo = folder.id;
+      }
+    });
+    frozenFolder = belongsTo;
+  }
+
+  const isFromFolder = !!frozenFolder;
 
   const newItem = anchorItem.cloneNode(true);
   newItem.classList.add("custom-folder-option");
@@ -666,41 +772,6 @@ function addFolderOptionToMenu(container, anchorItem) {
     ? "M19 13H5v-2h14v2z"
     : "M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z";
   newItem.innerHTML = `<div class="mat-mdc-menu-item-icon" style="display:flex; align-items:center;"><svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24" style="margin-left: 10px;"><path d="${icon}"/></svg></div><span class="mat-mdc-menu-item-text" style="flex-grow:1; text-align:right; font-family:'Google Sans' !important; font-size:14px !important;">${isFromFolder ? "הסר מהתיקייה" : "הוסף לתיקייה"}</span>`;
-
-  // Strategy 1: mousedown handler already set lastContextChat — use it.
-  let frozenUrl = lastContextChat?.url || "";
-  let frozenTitle = lastContextChat?.title || "";
-  const frozenFolder = lastContextChat?.fromFolder || null;
-
-  // Strategy 2: The button that opened the CDK menu has aria-expanded="true".
-  // Walk UP the DOM from the trigger until we find an ancestor that contains
-  // a chat link — resilient to any Gemini DOM structure.
-  if (!frozenUrl) {
-    const trigger = document.querySelector('[aria-expanded="true"]');
-    if (trigger) {
-      let el = trigger.parentElement;
-      while (el && el !== document.body) {
-        const link = el.querySelector(CHAT_LINK_SEL);
-        if (link && !link.closest("#gemini-custom-folders")) {
-          frozenUrl = chatPath(link.getAttribute("href"));
-          frozenTitle = link.textContent.trim();
-          break;
-        }
-        el = el.parentElement;
-      }
-    }
-  }
-
-  // Strategy 3: Hover fallback (covers edge cases where focus moved quickly).
-  if (!frozenUrl) {
-    const hoveredLink = Array.from(
-      document.querySelectorAll(CHAT_LINK_SEL),
-    ).find((a) => !a.closest("#gemini-custom-folders") && a.matches(":hover"));
-    if (hoveredLink) {
-      frozenUrl = chatPath(hoveredLink.getAttribute("href"));
-      frozenTitle = hoveredLink.textContent.trim();
-    }
-  }
 
   newItem.addEventListener("click", (e) => {
     e.stopPropagation(); // prevent CDK and mousedown handler from interfering
@@ -713,6 +784,7 @@ function addFolderOptionToMenu(container, anchorItem) {
         f.chats = f.chats.filter((c) => c.url !== frozenUrl);
         saveFolders();
       }
+      document.querySelector(".cdk-overlay-backdrop")?.click();
       return;
     }
 
@@ -797,11 +869,16 @@ document.addEventListener(
     const href = link.getAttribute("href");
     if (!href) return;
     const url = chatPath(href);
-    if (!url || url === lastContextChat?.url) return;
+    
+    // Always recalculate folder membership on hover, even if the URL hasn't changed.
+    // The chat might have been added to or removed from a folder since the last hover.
     let belongsTo = null;
     myFolders.forEach((f) => {
-      if (f.chats.some((c) => chatPath(c.url) === url)) belongsTo = f.id;
+      if (f.chats.some((c) => chatPath(c.url) === url)) {
+        belongsTo = f.id;
+      }
     });
+
     lastContextChat = {
       url,
       title: link.textContent.trim(),
@@ -827,7 +904,15 @@ const observerCallback = (mutations) => {
             const anchorItem = content.querySelector(
               "button, a, .mat-mdc-menu-item",
             );
-            if (anchorItem) {
+
+            // Only inject if it's the chat options menu (contains rename/delete options)
+            const buttons = Array.from(content.querySelectorAll("button, a, .mat-mdc-menu-item, .mat-menu-item"));
+            const isChatMenu = buttons.some(btn => {
+              const html = btn.innerHTML;
+              return html.includes("M3 17.25V21h3.75") || html.includes("M6 19c0 1.1.9 2");
+            }) || findNativeButton(buttons, ["rename", "delete", "שנה שם", "שינוי שם", "מחק", "מחיקה"]);
+
+            if (anchorItem && isChatMenu) {
               addFolderOptionToMenu(content, anchorItem);
             }
           }
