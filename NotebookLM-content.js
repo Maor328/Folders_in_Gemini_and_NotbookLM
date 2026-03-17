@@ -120,8 +120,8 @@ function getNotebookDetails(el) {
       if (!text || text === title) return;
       
       const lowerText = text.toLowerCase();
-      // Role matching (Owner, Editor, Viewer, Shared, בעלים, עורך, צופה, שותף, משתמש)
-      if (/^(owner|editor|viewer|shared|בעלים|עורך|צופה|שותף|משותף)$/i.test(text)) {
+      // Role matching (Owner, Editor, Viewer, Reader, Shared, בעלים, עורך, צופה, שותף, קורא, משתמש)
+      if (/^(owner|editor|viewer|reader|shared|בעלים|עורך|צופה|שותף|משותף|קורא)$/i.test(text)) {
         role = text;
       } 
       // Sources matching (10 מקורות, 5 sources)
