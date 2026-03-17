@@ -515,6 +515,13 @@ function showRemoveNotebookModal(title, folderId) {
   const doRemove = () => {
     const f = nlmFolders.find((f) => f.id === folderId);
     if (f) f.notebooks = f.notebooks.filter((n) => n.title !== title);
+    
+    // Crucial: reset the tracked context so the menu flips back
+    // from "Remove from folder" to "Add to folder" immediately
+    if (lastContextNotebook && lastContextNotebook.title === title) {
+      lastContextNotebook.fromFolder = null;
+    }
+    
     saveFolders();
     closeAllOverlays();
   };
