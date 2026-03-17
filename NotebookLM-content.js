@@ -704,7 +704,7 @@ function openNotebookContextMenu(e, title, folderId) {
   entry.style.cssText += `
     position: fixed !important;
     top: ${e.clientY - 10}px !important;
-    left: ${e.clientX - 25}px !important;
+    left: ${e.clientX - 50}px !important;
     opacity: 0 !important;
     pointer-events: none !important;
     z-index: 2147483647 !important;
