@@ -8,22 +8,42 @@ const overlays = {
 let lastContextChat = null;
 let isMainSectionOpen = false;
 
-// Normalize any Gemini chat href (absolute OR relative) to just the path.
-// Gemini sometimes uses absolute URLs like https://gemini.google.com/app/ID
-// and sometimes relative like /app/ID — this handles both uniformly.
+// Normalize Gemini/NotebookLM chat hrefs (absolute OR relative).
 function chatPath(href) {
   if (!href) return "";
   try {
-    // Remove query string then extract pathname for absolute URLs
     const url = new URL(href, window.location.origin);
-    return url.pathname; // e.g. "/app/22610c776770c88d"
+    const pathname = url.pathname || "";
+
+    // Gemini conversations are path-based (/app/<id>), so strip query/hash noise.
+    if (pathname.includes("/app/")) return pathname;
+
+    // NotebookLM can be query-keyed (e.g. /notebook?id=...).
+    if (pathname.includes("/notebook")) {
+      // Prefer path-keyed notebooks when present (/notebook/<id>).
+      if (/\/notebook\/[^/]+/.test(pathname)) return pathname;
+      if (url.searchParams.has("id")) {
+        return `${pathname}?id=${url.searchParams.get("id")}`;
+      }
+      return `${pathname}${url.search}`;
+    }
+
+    return pathname;
   } catch {
-    return href.split("?")[0];
+    const cleanHref = href.split("#")[0];
+    if (cleanHref.includes("/notebook")) {
+      const [path, query = ""] = cleanHref.split("?");
+      const params = new URLSearchParams(query);
+      if (params.has("id")) return `${path}?id=${params.get("id")}`;
+      return query ? `${path}?${query}` : path;
+    }
+    return cleanHref.split("?")[0];
   }
 }
 
 // CSS selector that matches chat links whether href is relative or absolute
-const CHAT_LINK_SEL = 'a[href*="/app/"]';
+const CHAT_LINK_SEL =
+  'a[href*="/app/"], a[href*="/notebook/"], a[href*="/notebook?"], a[href*="notebook?id="]';
 
 chrome.storage.local.get(["geminiFolders"], function (result) {
   if (result.geminiFolders) {
@@ -413,14 +433,34 @@ function openFolderSelectionMenu(x, y, url, title) {
   menu.style.left = `${clampMenuLeft(x - menuWidth, menuWidth)}px`;
 }
 
-// --- Helper: find a native Google menu button by aria-label or text content ---
-// This replaces brittle SVG-path detection (Bug 3 fix).
-function findNativeButton(buttons, keywords) {
-  return buttons.find((btn) => {
-    const label = (btn.getAttribute("aria-label") || "").toLowerCase();
-    const text = btn.textContent.trim().toLowerCase();
-    return keywords.some((kw) => label.includes(kw) || text.includes(kw));
-  });
+const NATIVE_MENU_ICON_MATCHERS = {
+  share: ["m18 16.08", "l8.91 12.7", "l7.05-4.11"],
+  rename: ["m3 17.25v21h3.75", "l-3.75-3.75"],
+  delete: ["m6 19c0 1.1.9 2", "v7h6v12z", "m19 4h-3.5"],
+};
+
+function hasMatchingIconPath(button, fragments) {
+  const iconPaths = Array.from(button.querySelectorAll("svg path"))
+    .map((p) => (p.getAttribute("d") || "").toLowerCase())
+    .join(" ");
+  if (!iconPaths) return false;
+  return fragments.some((fragment) => iconPaths.includes(fragment));
+}
+
+// Language-agnostic native action resolution by icon signature + fallback position.
+function findNativeButton(buttons, action) {
+  const fragments = NATIVE_MENU_ICON_MATCHERS[action];
+  if (fragments) {
+    const byIcon = buttons.find((btn) => hasMatchingIconPath(btn, fragments));
+    if (byIcon) return byIcon;
+  }
+
+  const fallbackIndex =
+    action === "share" ? 0 : action === "rename" ? 1 : action === "delete" ? 2 : -1;
+  if (fallbackIndex >= 0 && fallbackIndex < buttons.length) {
+    return buttons[fallbackIndex];
+  }
+  return null;
 }
 
 function openChatContextMenu(e, url, title, folderId) {
@@ -449,19 +489,19 @@ function openChatContextMenu(e, url, title, folderId) {
       label: "שיתוף השיחה",
       icon: "M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z",
       action: "Share",
-      keywords: ["share", "שתף", "שיתוף"],
+      nativeAction: "share",
     },
     {
       label: "שינוי השם",
       icon: "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z",
       action: "Rename",
-      keywords: ["rename", "שנה שם", "שינוי שם"],
+      nativeAction: "rename",
     },
     {
       label: "מחיקה",
       icon: "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z",
       action: "Delete",
-      keywords: ["delete", "מחק", "מחיקה"],
+      nativeAction: "delete",
     },
     {
       label: "הסר מהתיקייה",
@@ -533,8 +573,8 @@ function openChatContextMenu(e, url, title, folderId) {
         if (googleBtns.length > 0) {
           observer.disconnect();
           clearTimeout(safetyTimer);
-          // Identify button by aria-label / text, not SVG path
-          const target = findNativeButton(googleBtns, opt.keywords);
+          // Identify button in a locale-agnostic way (icon signature / position)
+          const target = findNativeButton(googleBtns, opt.nativeAction);
           if (target) {
             target.click();
           } else {
@@ -670,7 +710,9 @@ function injectFoldersUI() {
   if (document.getElementById("gemini-custom-folders")) return;
   const gemsList =
     document.querySelector(".gems-list-container") ||
-    document.querySelector("conversation-list");
+    document.querySelector("conversation-list") ||
+    document.querySelector("div.project-grid-container") ||
+    document.querySelector("project-grid");
   if (gemsList) {
     const div = document.createElement("div");
     div.id = "gemini-custom-folders";
@@ -682,10 +724,13 @@ function injectFoldersUI() {
             </div>
             <div id="folders-list" class="${isMainSectionOpen ? "open" : ""}"></div>
         `;
-    if (gemsList.className.includes("gems-list-container")) {
+    if (
+      gemsList.className.includes("gems-list-container") ||
+      gemsList.tagName.toLowerCase() === "conversation-list"
+    ) {
       gemsList.insertAdjacentElement("afterend", div);
     } else {
-      gemsList.insertAdjacentElement("afterbegin", div);
+      gemsList.insertAdjacentElement("beforebegin", div);
     }
 
     document
@@ -890,48 +935,111 @@ document.addEventListener(
 
 let domUpdateTimer = null;
 const observerCallback = (mutations) => {
+  let shouldProcessChatMenu = false;
+  let shouldRefreshUI = false;
+
   // Menu detection logic for adding our folder option
   for (const mutation of mutations) {
     mutation.addedNodes.forEach((node) => {
-      if (node.nodeType === 1) {
-        const content = node.matches(".mat-mdc-menu-content")
-          ? node
-          : node.querySelector(".mat-mdc-menu-content");
-        if (content) {
-          if (!content.querySelector(".custom-folder-option")) {
-            // Unconditionally find the first interactive item (button or link)
-            // in the native menu and use it as the anchor for our custom option.
-            const anchorItem = content.querySelector(
-              "button, a, .mat-mdc-menu-item",
-            );
+      if (node.nodeType !== 1) return;
+      const element = /** @type {Element} */ (node);
 
-            // Only inject if it's the chat options menu (contains rename/delete options)
-            const buttons = Array.from(content.querySelectorAll("button, a, .mat-mdc-menu-item, .mat-menu-item"));
-            const isChatMenu = buttons.some(btn => {
-              const html = btn.innerHTML;
-              return html.includes("M3 17.25V21h3.75") || html.includes("M6 19c0 1.1.9 2");
-            }) || findNativeButton(buttons, ["rename", "delete", "שנה שם", "שינוי שם", "מחק", "מחיקה"]);
+      if (
+        element.matches(".mat-mdc-menu-content, .cdk-overlay-pane, .mat-menu-panel") ||
+        element.querySelector(".mat-mdc-menu-content, .mat-menu-panel")
+      ) {
+        shouldProcessChatMenu = true;
+      }
 
-            if (anchorItem && isChatMenu) {
-              addFolderOptionToMenu(content, anchorItem);
-            }
-          }
+      if (
+        element.matches(CHAT_LINK_SEL) ||
+        element.querySelector(CHAT_LINK_SEL) ||
+        element.matches(".gems-list-container, conversation-list, div.project-grid-container, project-grid")
+      ) {
+        shouldRefreshUI = true;
+      }
+    });
+  }
+
+  if (shouldProcessChatMenu) {
+    const menus = Array.from(document.querySelectorAll(".mat-mdc-menu-content"));
+    menus.forEach((content) => {
+      if (!content.querySelector(".custom-folder-option")) {
+        // Unconditionally find the first interactive item (button or link)
+        // in the native menu and use it as the anchor for our custom option.
+        const anchorItem = content.querySelector("button, a, .mat-mdc-menu-item");
+
+        // Only inject if it's the chat options menu (contains rename/delete icons)
+        const buttons = Array.from(
+          content.querySelectorAll("button, a, .mat-mdc-menu-item, .mat-menu-item"),
+        );
+        const isChatMenu =
+          !!findNativeButton(buttons, "rename") ||
+          !!findNativeButton(buttons, "delete");
+
+        if (anchorItem && isChatMenu) {
+          addFolderOptionToMenu(content, anchorItem);
         }
       }
     });
   }
 
   // Debounced UI Inject and Chat Hiding
-  if (domUpdateTimer) clearTimeout(domUpdateTimer);
-  domUpdateTimer = setTimeout(() => {
-    injectFoldersUI();
-    hideMovedChats();
-  }, 100);
+  if (shouldRefreshUI) {
+    if (domUpdateTimer) clearTimeout(domUpdateTimer);
+    domUpdateTimer = setTimeout(() => {
+      injectFoldersUI();
+      hideMovedChats();
+      maybeRefreshObserverTargets();
+    }, 150);
+  }
 };
 
 const menuObserver = new MutationObserver(observerCallback);
-menuObserver.observe(document.body, { childList: true, subtree: true });
+const OBSERVER_ROOT_SELECTORS = [
+  ".cdk-overlay-container",
+  ".gems-list-container",
+  "conversation-list",
+  "div.project-grid-container",
+  "project-grid",
+];
+let observerRootSignature = null;
+
+function getObserverRootsAndSignature() {
+  const roots = [];
+  const signatureParts = [];
+  OBSERVER_ROOT_SELECTORS.forEach((sel) => {
+    const root = document.querySelector(sel);
+    if (root) {
+      roots.push(root);
+      signatureParts.push(sel);
+    }
+  });
+  return { roots, signature: signatureParts.join("|") };
+}
+
+function refreshObserverTargets(roots) {
+  menuObserver.disconnect();
+
+  if (roots.length === 0) {
+    menuObserver.observe(document.body, { childList: true, subtree: true });
+    return;
+  }
+
+  roots.forEach((root) => {
+    menuObserver.observe(root, { childList: true, subtree: true });
+  });
+}
+
+function maybeRefreshObserverTargets() {
+  const { roots, signature } = getObserverRootsAndSignature();
+  if (signature !== observerRootSignature) {
+    observerRootSignature = signature;
+    refreshObserverTargets(roots);
+  }
+}
 
 // Initial run
+maybeRefreshObserverTargets();
 injectFoldersUI();
 hideMovedChats();
