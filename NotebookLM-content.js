@@ -611,122 +611,70 @@ function openFolderSelectionMenu(x, y, details) {
 function openNotebookContextMenu(e, title, folderId) {
   closeAllOverlays();
 
-  const menu = document.createElement("div");
-  menu.className = "folder-dropdown";
-  menu.style.zIndex = "2147483647";
-
-  const options = [
-    {
-      label: "שינוי השם",
-      icon: "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z",
-      action: "rename",
-    },
-    {
-      label: "הסר מהתיקייה",
-      icon: "M19 13H5v-2h14v2z",
-      action: "remove",
-    },
-  ];
-
-  options.forEach((opt) => {
-    const item = document.createElement("div");
-    item.className = "folder-dropdown-item";
-    item.innerHTML = `
-      <span style="flex-grow:1;text-align:right;font-size:14px;">${opt.label}</span>
-      <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="${opt.icon}"/></svg>`;
-    item.onclick = (event) => {
-      event.stopPropagation();
-      closeAllOverlays();
-
-      if (opt.action === "remove") {
-        showRemoveNotebookModal(title, folderId);
-        return;
-      }
-
-      // Rename: delegate to NLM's native rename dialog.
-      // Find the hidden row/card, reveal it off-screen, click its ⋮ button,
-      // then click the native "עריכת השם" item — same pattern as Gemini.
-      const allSpans = Array.from(document.querySelectorAll(NB_TITLE_SEL));
-      const titleSpan = allSpans.find(
-        (s) =>
-          !s.closest("#nblm-custom-folders") &&
-          (s.getAttribute("title") || s.textContent).trim() === title,
-      );
-      const row = titleSpan ? getNotebookRow(titleSpan) : null;
-      const menuBtn = row?.querySelector(NB_MENU_BTN_SEL);
-
-      if (!menuBtn) {
-        // Fallback: row not in DOM (e.g. grid view) — show our own modal
-        showRenameNotebookModal(title);
-        return;
-      }
-
-      // Reveal the row using the same off-screen technique as Gemini's
-      // Delete/Share flow. Programmatic .click() bypasses pointer-events and
-      // visibility — Angular's event binding still receives the click.
-      const wasHidden = row.classList.contains("nblm-hidden-notebook");
-      if (wasHidden) {
-        row.classList.remove("nblm-hidden-notebook");
-        row.classList.add("nblm-temp-reveal");
-      }
-
-      menuBtn.click();
-
-      const restore = () => {
-        if (wasHidden) {
-          row.classList.remove("nblm-temp-reveal");
-          row.classList.add("nblm-hidden-notebook");
-        }
-        blocker.remove();
-      };
-
-      // Cover the page so the native menu (which opens at real coordinates)
-      // is not visible to the user while we auto-click "עריכת השם".
-      const blocker = document.createElement("div");
-      blocker.style.cssText =
-        "position:fixed;inset:0;z-index:2147483645;background:transparent;pointer-events:none;";
-      document.body.appendChild(blocker);
-
-      const safetyTimer = setTimeout(() => {
-        obs.disconnect();
-        restore();
-        showRenameNotebookModal(title); // fallback after 3s
-      }, 3000);
-
-      // KEY FIX: keep watching until "עריכת השם" specifically appears.
-      // Angular adds menu items asynchronously after the container is injected,
-      // so we must NOT disconnect on the first mutation — only when we find
-      // the exact button we need.
-      const obs = new MutationObserver(() => {
-        const allItems = Array.from(
-          document.querySelectorAll(
-            ".mat-mdc-menu-content button, .mat-mdc-menu-item, [role='menuitem']",
-          ),
-        );
-        const renameBtn = allItems.find((btn) =>
-          btn.textContent.trim().includes("עריכת השם"),
-        );
-        if (!renameBtn) return; // not ready yet — keep watching
-
-        obs.disconnect();
-        clearTimeout(safetyTimer);
-        renameBtn.click();
-        restore();
-      });
-      obs.observe(document.body, { childList: true, subtree: true });
-    };
-    menu.appendChild(item);
+  // Find the native entry (could be a table row or a grid card)
+  const allEntries = Array.from(document.querySelectorAll(`${NB_ROW_SEL}, ${NB_CARD_SEL}`));
+  const entry = allEntries.find((el) => {
+    return !el.closest("#nblm-custom-folders") && getNotebookDetails(el).title === title;
   });
 
-  document.body.appendChild(menu);
-  overlays.chatMenu = menu;
+  if (!entry) {
+    // Very rare fallback if DOM completely re-rendered and missing
+    showRenameNotebookModal(title);
+    return;
+  }
 
-  const rect = e.target.getBoundingClientRect();
-  const mw = 190;
-  let top = rect.top;
-  if (top + 120 > window.innerHeight) top = window.innerHeight - 130;
-  menu.style.top = `${top}px`;
-  menu.style.left = `${clampLeft(rect.left - mw, mw)}px`;
+  // Find the native 3-dots button inside that entry
+  const menuBtn =
+    entry.querySelector(NB_MENU_BTN_SEL) ||
+    entry.querySelector('button[aria-haspopup="menu"], button.mat-mdc-menu-trigger');
+
+  if (!menuBtn) {
+    showRenameNotebookModal(title);
+    return;
+  }
+
+  // Update lastContextNotebook so NLM menu injection creates "Remove from folder" properly
+  const details = getNotebookDetails(entry);
+  lastContextNotebook = {
+    title: details.title,
+    sources: details.sources,
+    date: details.date,
+    role: details.role,
+    fromFolder: folderId,
+  };
+
+  const wasHidden = entry.classList.contains("nblm-hidden-notebook");
+  const originalCssText = entry.style.cssText;
+
+  if (wasHidden) {
+    entry.classList.remove("nblm-hidden-notebook");
+  }
+
+  // Make the entire native row/card fixed exactly where the user clicked, but invisible.
+  // This tricks Angular CDK into opening the native menu directly under the mouse!
+  // We offset it slightly so the menu doesn't spawn right under the cursor and cause accidental clicks.
+  entry.style.cssText += `
+    position: fixed !important;
+    top: ${e.clientY - 10}px !important;
+    left: ${e.clientX - 50}px !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    z-index: 2147483647 !important;
+    width: 200px !important;
+  `;
+
+  // Trigger the native NLM menu!
+  menuBtn.click();
+
+  // Restore everything after Angular CDK has had a chance to measure and open (usually 1-2 frames)
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      entry.style.cssText = originalCssText;
+      if (wasHidden) {
+        entry.classList.add("nblm-hidden-notebook");
+      }
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
