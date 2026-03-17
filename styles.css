@@ -136,19 +136,17 @@
   position: fixed;
   background: #282a2c;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  border-radius: 4px; /* NLM uses sharper corners for menus */
   padding: 8px 0;
   z-index: 200000;
-  min-width: 180px;
-  max-height: 300px;
-  overflow-y: auto;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  font-family: "Google Sans", sans-serif !important;
+  min-width: 200px;
+  box-shadow: 0 5px 5px -3px rgba(0,0,0,.2), 0 8px 10px 1px rgba(0,0,0,.14), 0 3px 14px 2px rgba(0,0,0,.12);
+  font-family: Roboto, "Google Sans", sans-serif !important;
 }
 
 .folder-dropdown-item {
   display: flex;
-  flex-direction: row-reverse;
+  flex-direction: row-reverse; /* Icon on the right for Hebrew */
   align-items: center;
   padding: 10px 16px;
   cursor: pointer;
@@ -156,10 +154,16 @@
   font-size: 14px;
   transition: background 0.2s;
   gap: 12px;
+  text-align: right;
+  justify-content: flex-start;
+}
+
+.folder-dropdown-item svg {
+  color: #c4c7c5;
 }
 
 .folder-dropdown-item:hover {
-  background: rgba(255, 255, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
 }
 
 /* ============================================================
@@ -183,10 +187,41 @@
   background: #282a2c;
   border-radius: 28px;
   padding: 24px;
-  width: 320px;
+  width: 360px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
-  font-family: "Google Sans", sans-serif;
+  font-family: Roboto, "Google Sans", sans-serif;
   direction: rtl;
+}
+
+.folder-modal h2 {
+  font-size: 24px;
+  font-weight: 400;
+  margin-top: 0;
+  color: #e3e3e3;
+  text-align: right;
+}
+
+.folder-modal p {
+  font-size: 14px;
+  color: #c4c7c5;
+  margin-bottom: 24px;
+  text-align: right;
+}
+
+.folder-modal .input-wrapper {
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.folder-modal label {
+  position: absolute;
+  top: -9px;
+  right: 12px;
+  font-size: 11px;
+  color: #a8c7fa;
+  background: #282a2c;
+  padding: 0 4px;
+  z-index: 1;
 }
 
 .folder-modal input {
@@ -197,14 +232,13 @@
   padding: 12px;
   color: white;
   font-size: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 0;
   outline: none;
   box-sizing: border-box;
 }
 
 .folder-modal input:focus {
-  border-color: #a8c7fa;
-  border-width: 2px;
+  border: 2px solid #a8c7fa;
   padding: 11px;
 }
 

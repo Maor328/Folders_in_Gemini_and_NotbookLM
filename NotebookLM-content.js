@@ -428,7 +428,7 @@ function showRenameFolderModal(folder) {
 }
 
 // ---------------------------------------------------------------------------
-// MODALS — Rename notebook (local label only — does not rename in NLM itself)
+// MODALS — Rename notebook (Performs a "Real Rename" in NLM backend)
 // ---------------------------------------------------------------------------
 
 function showRenameNotebookModal(oldTitle) {
@@ -436,22 +436,13 @@ function showRenameNotebookModal(oldTitle) {
   const modal = document.createElement("div");
   modal.className = "folder-modal-overlay";
   modal.innerHTML = `
-    <div class="folder-modal" style="width:360px;padding:28px 24px 20px;">
-      <div style="position:relative;margin-bottom:20px;">
-        <label style="
-          position:absolute;top:-9px;right:12px;
-          font-size:11px;color:#a8c7fa;
-          background:#282a2c;padding:0 4px;
-          font-family:'Google Sans',sans-serif;">הכותרת של ה-Notebook*</label>
-        <input type="text" id="nblm-rename-input" autocomplete="off" spellcheck="false"
-          style="width:100%;box-sizing:border-box;background:transparent;
-            border:2px solid #a8c7fa;border-radius:4px;padding:14px 12px 10px;
-            color:white;font-size:15px;outline:none;font-family:'Google Sans',sans-serif;">
+    <div class="folder-modal">
+      <h2 style="margin-bottom:24px;">שנה את שם ה-Notebook</h2>
+      <div class="input-wrapper">
+        <label>הכותרת של ה-Notebook*</label>
+        <input type="text" id="nblm-rename-input" autocomplete="off" spellcheck="false">
       </div>
-      <p style="color:#8e918f;font-size:12px;margin:0 0 20px;text-align:right;">
-        הערה: שינוי שם כאן לא ישנה את השם ב-NotebookLM עצמו.
-      </p>
-      <div style="display:flex;flex-direction:row;gap:12px;justify-content:flex-start;">
+      <div style="display:flex;flex-direction:row;gap:12px;justify-content:flex-start;margin-top:8px;">
         <button class="confirm-btn-blue" id="nblm-confirm-rename">שמירה</button>
         <button class="cancel-btn-plain" id="nblm-cancel-rename">ביטול</button>
       </div>
@@ -462,31 +453,120 @@ function showRenameNotebookModal(oldTitle) {
   const input = document.getElementById("nblm-rename-input");
   if (input) {
     input.value = oldTitle;
-    input.focus();
-    input.select();
+    setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 50);
   }
 
   const confirm = () => {
     const newTitle = input?.value.trim();
     if (newTitle && newTitle !== oldTitle) {
+      // 1. Update our local storage immediately for UI responsiveness
       nlmFolders.forEach((f) =>
         f.notebooks.forEach((n) => {
           if (n.title === oldTitle) n.title = newTitle;
         }),
       );
       saveFolders();
+      
+      // 2. Trigger "Real Rename" if the notebook is on screen or by switching tabs
+      performNativeAction(oldTitle, 'rename', newTitle);
     }
     closeAllOverlays();
   };
-  document
-    .getElementById("nblm-confirm-rename")
-    ?.addEventListener("click", confirm);
-  document
-    .getElementById("nblm-cancel-rename")
-    ?.addEventListener("click", closeAllOverlays);
+  
+  document.getElementById("nblm-confirm-rename")?.addEventListener("click", confirm);
+  document.getElementById("nblm-cancel-rename")?.addEventListener("click", closeAllOverlays);
   input?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") confirm();
     if (e.key === "Escape") closeAllOverlays();
+  });
+}
+
+/**
+ * Performs a "Native Action" (Rename, Delete, Remove) by finding the notebook in NLM's list.
+ * If the notebook is not on the current tab, it switches tabs first.
+ * @param {string} oldTitle - The current title of the notebook.
+ * @param {string} action - 'rename' | 'delete' | 'remove-shared'
+ * @param {string} [newValue] - New title for rename action.
+ */
+async function performNativeAction(oldTitle, action, newValue = "") {
+  let entry = findNotebookEntryByTitle(oldTitle);
+
+  // 1. Try switching tabs if not found
+  if (!entry) {
+    const tabs = Array.from(document.querySelectorAll('button, [role="tab"], .mat-mdc-tab'));
+    const otherTab = tabs.find(t => {
+      const txt = t.textContent.toLowerCase();
+      // Logic: if it's likely the other tab, click it
+      if (action === 'remove-shared') {
+        return txt.includes("shared") || txt.includes("שותפו");
+      }
+      return txt.includes("my notebooks") || txt.includes("המחברות שלי") || txt.includes("shared") || txt.includes("שותפו");
+    });
+
+    if (otherTab) {
+      otherTab.click();
+      await new Promise(r => setTimeout(r, 800));
+      entry = findNotebookEntryByTitle(oldTitle);
+    }
+  }
+
+  if (!entry) return;
+
+  // 2. Click native menu
+  const menuBtn = entry.querySelector(NB_MENU_BTN_SEL) || 
+                  entry.querySelector('button[aria-haspopup="menu"], button.mat-mdc-menu-trigger');
+  if (!menuBtn) return;
+  menuBtn.click();
+  await new Promise(r => setTimeout(r, 200));
+
+  // 3. Find the correct menu option
+  const menuItems = Array.from(document.querySelectorAll('.mat-mdc-menu-item, [role="menuitem"]'));
+  let opt = null;
+  if (action === 'rename') {
+    opt = menuItems.find(i => {
+      const t = i.textContent.toLowerCase();
+      return t.includes("rename") || t.includes("עריכת") || t.includes("שינוי");
+    });
+  } else if (action === 'delete') {
+    opt = menuItems.find(i => i.textContent.includes("מחיקה") || i.textContent.toLowerCase().includes("delete"));
+  } else if (action === 'remove-shared') {
+    opt = menuItems.find(i => i.textContent.includes("הסרת") || i.textContent.toLowerCase().includes("remove"));
+  }
+
+  if (!opt) return;
+  opt.click();
+  await new Promise(r => setTimeout(r, 400));
+
+  // 4. Handle native dialogs
+  if (action === 'rename') {
+    const nativeInput = document.querySelector('mat-dialog-container input, .mat-mdc-dialog-container input');
+    if (nativeInput) {
+      nativeInput.value = newValue;
+      nativeInput.dispatchEvent(new Event('input', { bubbles: true }));
+      const saveBtn = Array.from(document.querySelectorAll('mat-dialog-container button, .mat-mdc-dialog-container button'))
+        .find(b => b.textContent.includes("שמירה") || b.textContent.toLowerCase().includes("save"));
+      if (saveBtn) saveBtn.click();
+    }
+  } else {
+    // Delete / Remove confirmation dialog
+    const confirmBtn = Array.from(document.querySelectorAll('mat-dialog-container button, .mat-mdc-dialog-container button'))
+      .find(b => 
+        b.textContent.includes("מחיקה") || 
+        b.textContent.includes("הסרה") || 
+        b.textContent.toLowerCase().includes("delete") || 
+        b.textContent.toLowerCase().includes("remove")
+      );
+    if (confirmBtn) confirmBtn.click();
+  }
+}
+
+function findNotebookEntryByTitle(title) {
+  const allEntries = Array.from(document.querySelectorAll(`${NB_ROW_SEL}, ${NB_CARD_SEL}`));
+  return allEntries.find((el) => {
+    return !el.closest("#nblm-custom-folders") && getNotebookDetails(el).title === title;
   });
 }
 
@@ -676,34 +756,54 @@ function openNotebookContextMenu(e, title, folderId) {
     : null;
 
   if (!entry || !menuBtn) {
-    // Notebook is not found in the current DOM (e.g. it's a Shared Notebook but user is on the "My Notebooks" tab)
-    // We must show a custom fallback dropdown since we can't proxy the native one.
+    // Determine role from storage if not in DOM
+    let role = "";
+    nlmFolders.forEach(f => {
+      const nb = f.notebooks.find(n => n.title === title);
+      if (nb) role = nb.role || "";
+    });
+
+    const isReader = /^(reader|viewer|קורא|צופה)$/i.test(role);
+
     const menu = document.createElement("div");
     menu.className = "folder-dropdown";
     
-    // Exact labels and icons matching NotebookLM's native menu
-    const options = [
-      {
+    // Build options based on role
+    const options = [];
+    
+    if (!isReader) {
+      options.push({
         id: "fb-delete",
         label: "מחיקה",
         icon: "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
-      },
-      {
-        id: "fb-remove",
-        label: "הסר מהתיקייה שלי",
+      });
+    } else {
+      options.push({
+        id: "fb-remove-shared",
+        label: "הסרת ה-Notebook",
         icon: "M19 13H5v-2h14v2z"
-      },
-      {
+      });
+    }
+
+    options.push({
+      id: "fb-remove-folder",
+      label: "הסר מהתיקייה שלי",
+      icon: "M19 13H5v-2h14v2z" // Note: NLM uses a minus/remove icon for this
+    });
+
+    if (!isReader) {
+      options.push({
         id: "fb-rename",
         label: "עריכת השם",
         icon: "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
-      },
-      {
-        id: "fb-report",
-        label: "דיווח על Notebook",
-        icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"
-      }
-    ];
+      });
+    }
+
+    options.push({
+      id: "fb-report",
+      label: "דיווח על Notebook",
+      icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"
+    });
 
     menu.innerHTML = options.map(opt => `
       <div class="folder-dropdown-item" id="${opt.id}">
@@ -715,24 +815,34 @@ function openNotebookContextMenu(e, title, folderId) {
     document.body.appendChild(menu);
     overlays.dropdown = menu;
 
-    menu.querySelector("#fb-rename").addEventListener("click", (ev) => {
+    menu.querySelector("#fb-rename")?.addEventListener("click", (ev) => {
       ev.stopPropagation();
       closeAllOverlays();
       showRenameNotebookModal(title);
     });
 
-    menu.querySelector("#fb-remove").addEventListener("click", (ev) => {
+    menu.querySelector("#fb-remove-folder").addEventListener("click", (ev) => {
       ev.stopPropagation();
       closeAllOverlays();
       showRemoveNotebookModal(title, folderId);
     });
 
-    menu.querySelector("#fb-delete").addEventListener("click", (ev) => {
+    menu.querySelector("#fb-delete")?.addEventListener("click", (ev) => {
       ev.stopPropagation();
       closeAllOverlays();
-      // Use the custom remove modal for now as full deletion is only safe when the notebook is visible
+      // Remove from our local folder first
       showRemoveNotebookModal(title, folderId);
-      alert("פעולת המחיקה המלאה נתמכת רק כאשר המחברת מופיעה ברשימה הראשית.");
+      // Then trigger the native delete flow (tab switching etc.)
+      performNativeAction(title, 'delete');
+    });
+
+    menu.querySelector("#fb-remove-shared")?.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      closeAllOverlays();
+      // Remove from our local folder first
+      showRemoveNotebookModal(title, folderId);
+      // Then trigger the native remove-shared flow
+      performNativeAction(title, 'remove-shared');
     });
 
     menu.querySelector("#fb-report").addEventListener("click", (ev) => {
@@ -741,14 +851,14 @@ function openNotebookContextMenu(e, title, folderId) {
       window.open("https://support.google.com/legal/answer/3110420", "_blank");
     });
 
-    const mw = 200;
-    const menuHeight = options.length * 40;
+    const mw = 220;
+    const menuHeight = options.length * 44;
     let top = e.clientY - 10;
     if (top + menuHeight > window.innerHeight)
       top = window.innerHeight - menuHeight - 20;
 
     menu.style.top = `${top}px`;
-    menu.style.left = `${clampLeft(e.clientX - mw, mw)}px`;
+    menu.style.left = `${clampLeft(e.clientX - 10, mw)}px`;
     return;
   }
 
