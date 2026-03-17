@@ -652,15 +652,15 @@ function openNotebookContextMenu(e, title, folderId) {
 
   // Make the entire native row/card fixed exactly where the user clicked, but invisible.
   // This tricks Angular CDK into opening the native menu directly under the mouse!
-  // We offset it slightly so the menu doesn't spawn right under the cursor and cause accidental clicks.
+  // We offset it slightly so the menu opens naturally to the bottom-right of the cursor.
   entry.style.cssText += `
     position: fixed !important;
-    top: ${e.clientY - 10}px !important;
-    left: ${e.clientX - 50}px !important;
+    top: ${e.clientY + 5}px !important;
+    left: ${e.clientX + 5}px !important;
     opacity: 0 !important;
     pointer-events: none !important;
     z-index: 2147483647 !important;
-    width: 200px !important;
+    width: 20px !important;
   `;
 
   // Trigger the native NLM menu!
