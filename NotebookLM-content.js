@@ -104,32 +104,64 @@ function getNotebookDetails(el) {
   // List view
   const titleSpan = el.querySelector(NB_TITLE_SEL);
   if (titleSpan) {
-    title = (titleSpan.getAttribute("title") || titleSpan.textContent || "").trim();
-    
+    title = (
+      titleSpan.getAttribute("title") ||
+      titleSpan.textContent ||
+      ""
+    ).trim();
+
     // In list view, typically we can find the other columns by their content or structure.
     // NotebookLM's table columns: Title, Role, Created, Sources (order may vary).
     // Angular Material might use td, mat-cell, role="gridcell", role="cell", or just plain divs.
-    let cells = Array.from(el.querySelectorAll("td, th, [role='cell'], [role='gridcell'], mat-cell, .mat-mdc-cell, .mdc-data-table__cell"));
+    let cells = Array.from(
+      el.querySelectorAll(
+        "td, th, [role='cell'], [role='gridcell'], mat-cell, .mat-mdc-cell, .mdc-data-table__cell",
+      ),
+    );
     if (cells.length === 0) {
       // Fallback: just look at all direct children of the row that contain text
       cells = Array.from(el.children);
     }
 
-    cells.forEach(cell => {
+    cells.forEach((cell) => {
       const text = cell.textContent.replace(/\s+/g, " ").trim();
       if (!text || text === title) return;
-      
+
       const lowerText = text.toLowerCase();
       // Role matching (Owner, Editor, Viewer, Reader, Shared, בעלים, עורך, צופה, שותף, קורא, משתמש)
-      if (/^(owner|editor|viewer|reader|shared|בעלים|עורך|צופה|שותף|משותף|קורא)$/i.test(text)) {
+      if (
+        /^(owner|editor|viewer|reader|shared|בעלים|עורך|צופה|שותף|משותף|קורא)$/i.test(
+          text,
+        )
+      ) {
         role = text;
-      } 
+      }
       // Sources matching (10 מקורות, 5 sources)
-      else if (lowerText.includes("מקורות") || lowerText.includes("source") || /^\d+$/.test(text)) {
+      else if (
+        lowerText.includes("מקורות") ||
+        lowerText.includes("source") ||
+        /^\d+$/.test(text)
+      ) {
         sources = text;
-      } 
+      }
       // Date matching (22 בפבר׳ 2026, 2024, ב-2, Jan 14)
-      else if (/\d{4}/.test(text) || text.includes("ב-") || text.includes("לפני") || text.includes("בר׳") || text.includes("נוב׳") || text.includes("אוק׳") || text.includes("ספט׳") || text.includes("אוג׳") || text.includes("יול׳") || text.includes("יונ׳") || text.includes("מאי") || text.includes("אפר׳") || text.includes("מרץ") || text.includes("פבר׳") || text.includes("ינו׳")) {
+      else if (
+        /\d{4}/.test(text) ||
+        text.includes("ב-") ||
+        text.includes("לפני") ||
+        text.includes("בר׳") ||
+        text.includes("נוב׳") ||
+        text.includes("אוק׳") ||
+        text.includes("ספט׳") ||
+        text.includes("אוג׳") ||
+        text.includes("יול׳") ||
+        text.includes("יונ׳") ||
+        text.includes("מאי") ||
+        text.includes("אפר׳") ||
+        text.includes("מרץ") ||
+        text.includes("פבר׳") ||
+        text.includes("ינו׳")
+      ) {
         // Only assign if it's not already assigned to sources
         if (!sources || sources !== text) {
           date = text;
@@ -152,12 +184,21 @@ function getNotebookDetails(el) {
       }
     }
     // Grid cards often have metadata in subtitle spans
-    const subtitles = Array.from(el.querySelectorAll(".mat-mdc-card-subtitle, .subtitle, span"));
-    subtitles.forEach(sub => {
+    const subtitles = Array.from(
+      el.querySelectorAll(".mat-mdc-card-subtitle, .subtitle, span"),
+    );
+    subtitles.forEach((sub) => {
       const text = sub.textContent.trim();
       if (!text || text === title) return;
 
-      if (text === "Owner" || text === "Editor" || text === "Viewer" || text === "בעלים" || text === "עורך" || text === "צופה") {
+      if (
+        text === "Owner" ||
+        text === "Editor" ||
+        text === "Viewer" ||
+        text === "בעלים" ||
+        text === "עורך" ||
+        text === "צופה"
+      ) {
         role = text;
       } else if (text.includes("מקורות") || text.includes("sources")) {
         sources = text;
@@ -166,7 +207,7 @@ function getNotebookDetails(el) {
       }
     });
   }
-  
+
   return { title, sources, date, role };
 }
 
@@ -572,11 +613,11 @@ function openFolderSelectionMenu(x, y, details) {
       // Avoid duplicates
       if (!f.notebooks.find((n) => n.title === details.title)) {
         // Include the rich details
-        f.notebooks.push({ 
-          title: details.title, 
-          sources: details.sources, 
-          date: details.date, 
-          role: details.role 
+        f.notebooks.push({
+          title: details.title,
+          sources: details.sources,
+          date: details.date,
+          role: details.role,
         });
         saveFolders();
       }
@@ -612,9 +653,14 @@ function openNotebookContextMenu(e, title, folderId) {
   closeAllOverlays();
 
   // Find the native entry (could be a table row or a grid card)
-  const allEntries = Array.from(document.querySelectorAll(`${NB_ROW_SEL}, ${NB_CARD_SEL}`));
+  const allEntries = Array.from(
+    document.querySelectorAll(`${NB_ROW_SEL}, ${NB_CARD_SEL}`),
+  );
   const entry = allEntries.find((el) => {
-    return !el.closest("#nblm-custom-folders") && getNotebookDetails(el).title === title;
+    return (
+      !el.closest("#nblm-custom-folders") &&
+      getNotebookDetails(el).title === title
+    );
   });
 
   if (!entry) {
@@ -626,7 +672,9 @@ function openNotebookContextMenu(e, title, folderId) {
   // Find the native 3-dots button inside that entry
   const menuBtn =
     entry.querySelector(NB_MENU_BTN_SEL) ||
-    entry.querySelector('button[aria-haspopup="menu"], button.mat-mdc-menu-trigger');
+    entry.querySelector(
+      'button[aria-haspopup="menu"], button.mat-mdc-menu-trigger',
+    );
 
   if (!menuBtn) {
     showRenameNotebookModal(title);
@@ -652,15 +700,15 @@ function openNotebookContextMenu(e, title, folderId) {
 
   // Make the entire native row/card fixed exactly where the user clicked, but invisible.
   // This tricks Angular CDK into opening the native menu directly under the mouse!
-  // We offset it slightly so the menu opens naturally to the bottom-right of the cursor.
+  // We offset it slightly so the menu doesn't spawn right under the cursor and cause accidental clicks.
   entry.style.cssText += `
     position: fixed !important;
-    top: ${e.clientY + 5}px !important;
-    left: ${e.clientX + 5}px !important;
+    top: ${e.clientY - 10}px !important;
+    left: ${e.clientX - 25}px !important;
     opacity: 0 !important;
     pointer-events: none !important;
     z-index: 2147483647 !important;
-    width: 20px !important;
+    width: 200px !important;
   `;
 
   // Trigger the native NLM menu!
@@ -692,12 +740,14 @@ function injectFolderOptionIntoNativeMenu(menuContainer) {
   );
   if (!anchorItem) return;
 
-  const details = lastContextNotebook ? { 
-    title: lastContextNotebook.title, 
-    sources: lastContextNotebook.sources, 
-    date: lastContextNotebook.date, 
-    role: lastContextNotebook.role 
-  } : null;
+  const details = lastContextNotebook
+    ? {
+        title: lastContextNotebook.title,
+        sources: lastContextNotebook.sources,
+        date: lastContextNotebook.date,
+        role: lastContextNotebook.role,
+      }
+    : null;
   const isFromFolder = !!lastContextNotebook?.fromFolder;
   const folderId = lastContextNotebook?.fromFolder || null;
 
@@ -783,7 +833,9 @@ function renderFolders() {
         </div>
       </div>
       <div class="folder-chats ${isOpen ? "open" : ""}" style="padding-right:16px;">
-        ${folder.notebooks.length > 0 ? `
+        ${
+          folder.notebooks.length > 0
+            ? `
           <div class="folder-chat-item nblm-table-header" style="cursor:default; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:4px; margin-bottom:8px; display:flex;">
             <div style="flex:1.5; color:#a8c7fa; font-size:12px; font-weight:500; text-align:right;">שם המחברת</div>
             <div style="flex:1; color:#a8c7fa; font-size:12px; font-weight:500; text-align:right; padding-right:8px;">מקורות</div>
@@ -791,7 +843,9 @@ function renderFolders() {
             <div style="flex:0.8; color:#a8c7fa; font-size:12px; font-weight:500; text-align:right; padding-right:8px;">תפקיד</div>
             <div style="width:24px;"></div> <!-- spacer -->
           </div>
-        ` : ''}
+        `
+            : ""
+        }
         ${folder.notebooks
           .map(
             (nb) => `
@@ -803,13 +857,13 @@ function renderFolders() {
               ${nb.title}
             </div>
             <div style="flex:1; font-size:13px; color:#c4c7c5; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:8px;">
-              ${nb.sources || '-'}
+              ${nb.sources || "-"}
             </div>
             <div style="flex:1; font-size:13px; color:#c4c7c5; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:8px;">
-              ${nb.date || '-'}
+              ${nb.date || "-"}
             </div>
             <div style="flex:0.8; font-size:13px; color:#c4c7c5; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:8px;">
-              ${nb.role || '-'}
+              ${nb.role || "-"}
             </div>
             <div class="folder-chat-menu-btn"
                  data-title="${nb.title}"
@@ -968,13 +1022,13 @@ document.addEventListener(
     nlmFolders.forEach((f) => {
       if (f.notebooks.some((n) => n.title === details.title)) fromFolder = f.id;
     });
-    
-    lastContextNotebook = { 
-      title: details.title, 
-      sources: details.sources, 
-      date: details.date, 
+
+    lastContextNotebook = {
+      title: details.title,
+      sources: details.sources,
+      date: details.date,
       role: details.role,
-      fromFolder 
+      fromFolder,
     };
   },
   true,
