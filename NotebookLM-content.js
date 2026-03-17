@@ -76,7 +76,7 @@ const overlays = {
 };
 
 /** Tracks the notebook the user most recently hovered or clicked.
- *  { title, fromFolder: folderId|null } */
+ *  { title, sources, date, role, fromFolder: folderId|null } */
 let lastContextNotebook = null;
 
 let isMainSectionOpen = false;
@@ -93,32 +93,69 @@ function getNotebookRow(el) {
 }
 
 /**
- * Return the notebook title from a list row OR a grid card element.
- * - List view: span.project-table-title inside tr[role="row"]
- * - Grid view: the aria-labelledby button title attribute inside project-button
+ * Return the notebook details (title, sources, date, role) from a list row OR a grid card element.
  */
-function getTitleFromEntry(el) {
+function getNotebookDetails(el) {
+  let title = "";
+  let sources = "";
+  let date = "";
+  let role = "";
+
   // List view
-  const span = el.querySelector(NB_TITLE_SEL);
-  if (span)
-    return (span.getAttribute("title") || span.textContent || "").trim();
-  // Grid view — the primary action button carries aria-labelledby pointing to
-  // an element whose id contains the notebook title; easiest to read from the
-  // mat-card's accessible label text via the labelled button's own text.
+  const titleSpan = el.querySelector(NB_TITLE_SEL);
+  if (titleSpan) {
+    title = (titleSpan.getAttribute("title") || titleSpan.textContent || "").trim();
+    
+    // In list view, typically we can find the other columns by their content or structure.
+    // NotebookLM's table columns: Title, Role, Created, Sources (order may vary).
+    // Let's grab all text cells and try to heuristically assign them.
+    const cells = Array.from(el.querySelectorAll("td, [role='cell']"));
+    cells.forEach(cell => {
+      const text = cell.textContent.trim();
+      if (!text || text === title) return;
+      
+      if (text === "Owner" || text === "Editor" || text === "Viewer" || text === "בעלים" || text === "עורך" || text === "צופה") {
+        role = text;
+      } else if (text.includes("מקורות") || text.includes("sources") || text.match(/^\d+$/)) {
+        // sometimes it's "10 מקורות" or just a number
+        sources = text;
+      } else if (text.match(/\d{4}/) || text.includes("ב-")) {
+        // Date strings usually have a year or "ב-" (like 22 בפבר׳ 2026)
+        date = text;
+      }
+    });
+
+    return { title, sources, date, role };
+  }
+
+  // Grid view
   const btn = el.querySelector("button.primary-action-button");
   if (btn) {
-    // Try to find the title element referenced by aria-labelledby
     const labelId = btn.getAttribute("aria-labelledby");
     if (labelId) {
-      // labelledby may be a space-separated list; take the first id
       const titleId = labelId.split(" ").find((id) => id.endsWith("-title"));
       if (titleId) {
         const titleEl = document.getElementById(titleId);
-        if (titleEl) return titleEl.textContent.trim();
+        if (titleEl) title = titleEl.textContent.trim();
       }
     }
+    // Grid cards often have metadata in subtitle spans
+    const subtitles = Array.from(el.querySelectorAll(".mat-mdc-card-subtitle, .subtitle, span"));
+    subtitles.forEach(sub => {
+      const text = sub.textContent.trim();
+      if (!text || text === title) return;
+
+      if (text === "Owner" || text === "Editor" || text === "Viewer" || text === "בעלים" || text === "עורך" || text === "צופה") {
+        role = text;
+      } else if (text.includes("מקורות") || text.includes("sources")) {
+        sources = text;
+      } else if (text.match(/\d{4}/) || text.includes("ב-")) {
+        date = text;
+      }
+    });
   }
-  return "";
+  
+  return { title, sources, date, role };
 }
 
 /**
@@ -186,7 +223,7 @@ function hideMovedNotebooks() {
   // List view — hide table rows
   document.querySelectorAll(NB_ROW_SEL).forEach((row) => {
     if (row.closest("#nblm-custom-folders")) return;
-    const title = getTitleFromEntry(row);
+    const { title } = getNotebookDetails(row);
     if (!title) return;
     row.classList.toggle("nblm-hidden-notebook", movedTitles.has(title));
   });
@@ -194,7 +231,7 @@ function hideMovedNotebooks() {
   // Grid view — hide project-button cards
   document.querySelectorAll(NB_CARD_SEL).forEach((card) => {
     if (card.closest("#nblm-custom-folders")) return;
-    const title = getTitleFromEntry(card);
+    const { title } = getNotebookDetails(card);
     if (!title) return;
     card.classList.toggle("nblm-hidden-notebook", movedTitles.has(title));
   });
@@ -499,7 +536,7 @@ function openFolderOptions(e, folder) {
 // DROPDOWN — Pick a folder to add a notebook into
 // ---------------------------------------------------------------------------
 
-function openFolderSelectionMenu(x, y, title) {
+function openFolderSelectionMenu(x, y, details) {
   closeAllOverlays();
   const menu = document.createElement("div");
   menu.className = "folder-dropdown nblm-top";
@@ -521,8 +558,14 @@ function openFolderSelectionMenu(x, y, title) {
     item.onclick = (e) => {
       e.stopPropagation();
       // Avoid duplicates
-      if (!f.notebooks.find((n) => n.title === title)) {
-        f.notebooks.push({ title });
+      if (!f.notebooks.find((n) => n.title === details.title)) {
+        // Include the rich details
+        f.notebooks.push({ 
+          title: details.title, 
+          sources: details.sources, 
+          date: details.date, 
+          role: details.role 
+        });
         saveFolders();
       }
       closeAllOverlays();
@@ -689,7 +732,12 @@ function injectFolderOptionIntoNativeMenu(menuContainer) {
   );
   if (!anchorItem) return;
 
-  const title = lastContextNotebook?.title || "";
+  const details = lastContextNotebook ? { 
+    title: lastContextNotebook.title, 
+    sources: lastContextNotebook.sources, 
+    date: lastContextNotebook.date, 
+    role: lastContextNotebook.role 
+  } : null;
   const isFromFolder = !!lastContextNotebook?.fromFolder;
   const folderId = lastContextNotebook?.fromFolder || null;
 
@@ -712,10 +760,10 @@ function injectFolderOptionIntoNativeMenu(menuContainer) {
       document.querySelector(".cdk-overlay-backdrop")?.click();
       const f = nlmFolders.find((f) => f.id === folderId);
       if (f) {
-        f.notebooks = f.notebooks.filter((n) => n.title !== title);
+        f.notebooks = f.notebooks.filter((n) => n.title !== details.title);
         saveFolders();
       }
-    } else if (title) {
+    } else if (details && details.title) {
       // Freeze click coordinates before closing the native menu
       const x = e.clientX;
       const y = e.clientY;
@@ -723,7 +771,7 @@ function injectFolderOptionIntoNativeMenu(menuContainer) {
       // menu can appear on top instead of behind it
       document.querySelector(".cdk-overlay-backdrop")?.click();
       // Open after a single frame so the CDK overlay is gone from the DOM
-      requestAnimationFrame(() => openFolderSelectionMenu(x, y, title));
+      requestAnimationFrame(() => openFolderSelectionMenu(x, y, details));
     }
   });
 
@@ -775,19 +823,39 @@ function renderFolders() {
         </div>
       </div>
       <div class="folder-chats ${isOpen ? "open" : ""}" style="padding-right:16px;">
+        // If there are notebooks, render the table header only once
+        ${folder.notebooks.length > 0 ? `
+          <div class="folder-chat-item nblm-table-header" style="cursor:default; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:4px; margin-bottom:8px;">
+            <div style="flex:1.5; color:#a8c7fa; font-size:12px; font-weight:500; text-align:right;">שם המחברת</div>
+            <div style="flex:1; color:#a8c7fa; font-size:12px; font-weight:500; text-align:right;">מקורות</div>
+            <div style="flex:1; color:#a8c7fa; font-size:12px; font-weight:500; text-align:right;">תאריך יצירה</div>
+            <div style="flex:0.8; color:#a8c7fa; font-size:12px; font-weight:500; text-align:right;">תפקיד</div>
+            <div style="width:24px;"></div> <!-- spacer for the menu button -->
+          </div>
+        ` : ''}
         ${folder.notebooks
           .map(
             (nb) => `
           <div class="folder-chat-item">
             <div class="nblm-nb-title-btn"
                  data-title="${nb.title}"
-                 style="flex-grow:1;text-align:right;font-size:13px;cursor:pointer;color:#e3e3e3;">
+                 style="flex:1.5; text-align:right; font-size:13px; cursor:pointer; color:#e3e3e3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" 
+                 title="${nb.title}">
               ${nb.title}
+            </div>
+            <div style="flex:1; font-size:13px; color:#c4c7c5; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              ${nb.sources || '-'}
+            </div>
+            <div style="flex:1; font-size:13px; color:#c4c7c5; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              ${nb.date || '-'}
+            </div>
+            <div style="flex:0.8; font-size:13px; color:#c4c7c5; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              ${nb.role || '-'}
             </div>
             <div class="folder-chat-menu-btn"
                  data-title="${nb.title}"
                  data-folder="${folder.id}"
-                 style="padding:4px;opacity:0.5;">
+                 style="padding:4px; opacity:0.5; width:24px; flex-shrink:0; cursor:pointer;">
               <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
             </div>
           </div>`,
@@ -848,7 +916,7 @@ function renderFolders() {
         const card = allCards.find(
           (c) =>
             !c.closest("#nblm-custom-folders") &&
-            getTitleFromEntry(c) === targetTitle,
+            getNotebookDetails(c).title === targetTitle,
         );
         if (card) {
           card.classList.remove("nblm-hidden-notebook");
@@ -934,14 +1002,21 @@ document.addEventListener(
     const entry = e.target.closest(NB_ROW_SEL) || e.target.closest(NB_CARD_SEL);
     if (!entry || entry.closest("#nblm-custom-folders")) return;
 
-    const title = getTitleFromEntry(entry);
-    if (!title || title === lastContextNotebook?.title) return;
+    const details = getNotebookDetails(entry);
+    if (!details.title || details.title === lastContextNotebook?.title) return;
 
     let fromFolder = null;
     nlmFolders.forEach((f) => {
-      if (f.notebooks.some((n) => n.title === title)) fromFolder = f.id;
+      if (f.notebooks.some((n) => n.title === details.title)) fromFolder = f.id;
     });
-    lastContextNotebook = { title, fromFolder };
+    
+    lastContextNotebook = { 
+      title: details.title, 
+      sources: details.sources, 
+      date: details.date, 
+      role: details.role,
+      fromFolder 
+    };
   },
   true,
 );

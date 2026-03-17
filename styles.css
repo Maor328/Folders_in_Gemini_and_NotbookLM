@@ -369,7 +369,7 @@ body.gemini-action-in-progress .cdk-overlay-backdrop {
 /* Wrapper panel injected above the notebook table.
    Matches NLM's own card style: dark surface, subtle border, rounded. */
 #nblm-custom-folders {
-  width: 50%;
+  width: 75%;
   max-width: 700px;
   min-width: 320px;
   box-sizing: border-box;
