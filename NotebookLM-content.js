@@ -670,21 +670,50 @@ function openNotebookContextMenu(e, title, folderId) {
     );
   });
 
-  if (!entry) {
-    // Very rare fallback if DOM completely re-rendered and missing
-    showRenameNotebookModal(title);
-    return;
-  }
+  const menuBtn = entry
+    ? (entry.querySelector(NB_MENU_BTN_SEL) ||
+       entry.querySelector('button[aria-haspopup="menu"], button.mat-mdc-menu-trigger'))
+    : null;
 
-  // Find the native 3-dots button inside that entry
-  const menuBtn =
-    entry.querySelector(NB_MENU_BTN_SEL) ||
-    entry.querySelector(
-      'button[aria-haspopup="menu"], button.mat-mdc-menu-trigger',
-    );
+  if (!entry || !menuBtn) {
+    // Notebook is not found in the current DOM (e.g. it's a Shared Notebook but user is on the "My Notebooks" tab)
+    // We must show a custom fallback dropdown since we can't proxy the native one.
+    const menu = document.createElement("div");
+    menu.className = "folder-dropdown";
+    menu.innerHTML = `
+      <div class="folder-dropdown-item" id="fb-rename">
+        <span style="flex-grow:1;text-align:right;">שינוי שם</span>
+        <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+      </div>
+      <div class="folder-dropdown-item" id="fb-remove">
+        <span style="flex-grow:1;text-align:right;">הסר מהתיקייה</span>
+        <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M19 13H5v-2h14v2z"/></svg>
+      </div>
+    `;
 
-  if (!menuBtn) {
-    showRenameNotebookModal(title);
+    document.body.appendChild(menu);
+    overlays.dropdown = menu;
+
+    menu.querySelector("#fb-rename").addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      closeAllOverlays();
+      showRenameNotebookModal(title);
+    });
+
+    menu.querySelector("#fb-remove").addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      closeAllOverlays();
+      showRemoveNotebookModal(title, folderId);
+    });
+
+    const mw = 180;
+    const menuHeight = 80;
+    let top = e.clientY - 10;
+    if (top + menuHeight > window.innerHeight)
+      top = window.innerHeight - menuHeight - 20;
+
+    menu.style.top = `${top}px`;
+    menu.style.left = `${clampLeft(e.clientX - mw, mw)}px`;
     return;
   }
 
