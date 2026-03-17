@@ -363,8 +363,8 @@ body.gemini-action-in-progress .cdk-overlay-backdrop {
 }
 
 /* ============================================================
-   NOTEBOOKLM — site-specific rules
-   ============================================================ */
+              NOTEBOOKLM — site-specific rules
+============================================================ */
 
 /* Wrapper panel injected above the notebook table.
    Matches NLM's own card style: dark surface, subtle border, rounded. */

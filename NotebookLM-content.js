@@ -108,20 +108,32 @@ function getNotebookDetails(el) {
     
     // In list view, typically we can find the other columns by their content or structure.
     // NotebookLM's table columns: Title, Role, Created, Sources (order may vary).
-    // Let's grab all text cells and try to heuristically assign them.
-    const cells = Array.from(el.querySelectorAll("td, [role='cell']"));
+    // Angular Material might use td, mat-cell, role="gridcell", role="cell", or just plain divs.
+    let cells = Array.from(el.querySelectorAll("td, th, [role='cell'], [role='gridcell'], mat-cell, .mat-mdc-cell, .mdc-data-table__cell"));
+    if (cells.length === 0) {
+      // Fallback: just look at all direct children of the row that contain text
+      cells = Array.from(el.children);
+    }
+
     cells.forEach(cell => {
-      const text = cell.textContent.trim();
+      const text = cell.textContent.replace(/\s+/g, " ").trim();
       if (!text || text === title) return;
       
-      if (text === "Owner" || text === "Editor" || text === "Viewer" || text === "בעלים" || text === "עורך" || text === "צופה") {
+      const lowerText = text.toLowerCase();
+      // Role matching (Owner, Editor, Viewer, etc.)
+      if (/^(owner|editor|viewer|בעלים|עורך|צופה)$/i.test(text)) {
         role = text;
-      } else if (text.includes("מקורות") || text.includes("sources") || text.match(/^\d+$/)) {
-        // sometimes it's "10 מקורות" or just a number
+      } 
+      // Sources matching (10 מקורות, 5 sources)
+      else if (lowerText.includes("מקורות") || lowerText.includes("source") || /^\d+$/.test(text)) {
         sources = text;
-      } else if (text.match(/\d{4}/) || text.includes("ב-")) {
-        // Date strings usually have a year or "ב-" (like 22 בפבר׳ 2026)
-        date = text;
+      } 
+      // Date matching (22 בפבר׳ 2026, 2024, ב-2, Jan 14)
+      else if (/\d{4}/.test(text) || text.includes("ב-") || text.includes("לפני") || text.includes("בר׳") || text.includes("נוב׳") || text.includes("אוק׳") || text.includes("ספט׳") || text.includes("אוג׳") || text.includes("יול׳") || text.includes("יונ׳") || text.includes("מאי") || text.includes("אפר׳") || text.includes("מרץ") || text.includes("פבר׳") || text.includes("ינו׳")) {
+        // Only assign if it's not already assigned to sources
+        if (!sources || sources !== text) {
+          date = text;
+        }
       }
     });
 
