@@ -680,16 +680,37 @@ function openNotebookContextMenu(e, title, folderId) {
     // We must show a custom fallback dropdown since we can't proxy the native one.
     const menu = document.createElement("div");
     menu.className = "folder-dropdown";
-    menu.innerHTML = `
-      <div class="folder-dropdown-item" id="fb-rename">
-        <span style="flex-grow:1;text-align:right;">שינוי שם</span>
-        <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+    
+    // Exact labels and icons matching NotebookLM's native menu
+    const options = [
+      {
+        id: "fb-delete",
+        label: "מחיקה",
+        icon: "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
+      },
+      {
+        id: "fb-remove",
+        label: "הסר מהתיקייה שלי",
+        icon: "M19 13H5v-2h14v2z"
+      },
+      {
+        id: "fb-rename",
+        label: "עריכת השם",
+        icon: "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
+      },
+      {
+        id: "fb-report",
+        label: "דיווח על Notebook",
+        icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"
+      }
+    ];
+
+    menu.innerHTML = options.map(opt => `
+      <div class="folder-dropdown-item" id="${opt.id}">
+        <span style="flex-grow:1;text-align:right;">${opt.label}</span>
+        <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="${opt.icon}"/></svg>
       </div>
-      <div class="folder-dropdown-item" id="fb-remove">
-        <span style="flex-grow:1;text-align:right;">הסר מהתיקייה</span>
-        <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M19 13H5v-2h14v2z"/></svg>
-      </div>
-    `;
+    `).join("");
 
     document.body.appendChild(menu);
     overlays.dropdown = menu;
@@ -706,8 +727,22 @@ function openNotebookContextMenu(e, title, folderId) {
       showRemoveNotebookModal(title, folderId);
     });
 
-    const mw = 180;
-    const menuHeight = 80;
+    menu.querySelector("#fb-delete").addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      closeAllOverlays();
+      // Use the custom remove modal for now as full deletion is only safe when the notebook is visible
+      showRemoveNotebookModal(title, folderId);
+      alert("פעולת המחיקה המלאה נתמכת רק כאשר המחברת מופיעה ברשימה הראשית.");
+    });
+
+    menu.querySelector("#fb-report").addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      closeAllOverlays();
+      window.open("https://support.google.com/legal/answer/3110420", "_blank");
+    });
+
+    const mw = 200;
+    const menuHeight = options.length * 40;
     let top = e.clientY - 10;
     if (top + menuHeight > window.innerHeight)
       top = window.innerHeight - menuHeight - 20;
