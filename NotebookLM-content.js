@@ -774,12 +774,12 @@ function injectFolderOptionIntoNativeMenu(menuContainer) {
     e.stopPropagation();
 
     if (isFromFolder) {
-      // Remove immediately — close the native menu first
+      // Close the native menu first
       document.querySelector(".cdk-overlay-backdrop")?.click();
-      const f = nlmFolders.find((f) => f.id === folderId);
-      if (f) {
-        f.notebooks = f.notebooks.filter((n) => n.title !== details.title);
-        saveFolders();
+      
+      // Show confirmation modal before removing
+      if (details && details.title) {
+        showRemoveNotebookModal(details.title, folderId);
       }
     } else if (details && details.title) {
       // Freeze click coordinates before closing the native menu
