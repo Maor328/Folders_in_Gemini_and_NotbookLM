@@ -823,39 +823,38 @@ function renderFolders() {
         </div>
       </div>
       <div class="folder-chats ${isOpen ? "open" : ""}" style="padding-right:16px;">
-        // If there are notebooks, render the table header only once
         ${folder.notebooks.length > 0 ? `
-          <div class="folder-chat-item nblm-table-header" style="cursor:default; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:4px; margin-bottom:8px;">
+          <div class="folder-chat-item nblm-table-header" style="cursor:default; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:4px; margin-bottom:8px; display:flex;">
             <div style="flex:1.5; color:#a8c7fa; font-size:12px; font-weight:500; text-align:right;">שם המחברת</div>
-            <div style="flex:1; color:#a8c7fa; font-size:12px; font-weight:500; text-align:right;">מקורות</div>
-            <div style="flex:1; color:#a8c7fa; font-size:12px; font-weight:500; text-align:right;">תאריך יצירה</div>
-            <div style="flex:0.8; color:#a8c7fa; font-size:12px; font-weight:500; text-align:right;">תפקיד</div>
-            <div style="width:24px;"></div> <!-- spacer for the menu button -->
+            <div style="flex:1; color:#a8c7fa; font-size:12px; font-weight:500; text-align:right; padding-right:8px;">מקורות</div>
+            <div style="flex:1; color:#a8c7fa; font-size:12px; font-weight:500; text-align:right; padding-right:8px;">תאריך יצירה</div>
+            <div style="flex:0.8; color:#a8c7fa; font-size:12px; font-weight:500; text-align:right; padding-right:8px;">תפקיד</div>
+            <div style="width:24px;"></div> <!-- spacer -->
           </div>
         ` : ''}
         ${folder.notebooks
           .map(
             (nb) => `
-          <div class="folder-chat-item">
+          <div class="folder-chat-item" style="display:flex;">
             <div class="nblm-nb-title-btn"
                  data-title="${nb.title}"
                  style="flex:1.5; text-align:right; font-size:13px; cursor:pointer; color:#e3e3e3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" 
                  title="${nb.title}">
               ${nb.title}
             </div>
-            <div style="flex:1; font-size:13px; color:#c4c7c5; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+            <div style="flex:1; font-size:13px; color:#c4c7c5; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:8px;">
               ${nb.sources || '-'}
             </div>
-            <div style="flex:1; font-size:13px; color:#c4c7c5; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+            <div style="flex:1; font-size:13px; color:#c4c7c5; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:8px;">
               ${nb.date || '-'}
             </div>
-            <div style="flex:0.8; font-size:13px; color:#c4c7c5; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+            <div style="flex:0.8; font-size:13px; color:#c4c7c5; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:8px;">
               ${nb.role || '-'}
             </div>
             <div class="folder-chat-menu-btn"
                  data-title="${nb.title}"
                  data-folder="${folder.id}"
-                 style="padding:4px; opacity:0.5; width:24px; flex-shrink:0; cursor:pointer;">
+                 style="padding:4px; opacity:0.5; width:24px; flex-shrink:0; cursor:pointer; display:flex; justify-content:center;">
               <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
             </div>
           </div>`,
