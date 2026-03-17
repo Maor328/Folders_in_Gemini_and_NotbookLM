@@ -20,17 +20,24 @@ function chatPath(href) {
 
     // NotebookLM can be query-keyed (e.g. /notebook?id=...).
     if (pathname.includes("/notebook")) {
+      // Prefer path-keyed notebooks when present (/notebook/<id>).
+      if (/\/notebook\/[^/]+/.test(pathname)) return pathname;
       if (url.searchParams.has("id")) {
         return `${pathname}?id=${url.searchParams.get("id")}`;
       }
-      if (/\/notebook\/[^/]+/.test(pathname)) return pathname;
       return `${pathname}${url.search}`;
     }
 
     return pathname;
   } catch {
-    if (href.includes("/notebook") && href.includes("?")) return href;
-    return href.split("?")[0];
+    const cleanHref = href.split("#")[0];
+    if (cleanHref.includes("/notebook")) {
+      const [path, query = ""] = cleanHref.split("?");
+      const params = new URLSearchParams(query);
+      if (params.has("id")) return `${path}?id=${params.get("id")}`;
+      return query ? `${path}?${query}` : path;
+    }
+    return cleanHref.split("?")[0];
   }
 }
 
@@ -448,7 +455,8 @@ function findNativeButton(buttons, action) {
     if (byIcon) return byIcon;
   }
 
-  const fallbackIndex = action === "share" ? 0 : action === "delete" ? 2 : -1;
+  const fallbackIndex =
+    action === "share" ? 0 : action === "rename" ? 1 : action === "delete" ? 2 : -1;
   if (fallbackIndex >= 0 && fallbackIndex < buttons.length) {
     return buttons[fallbackIndex];
   }
@@ -487,6 +495,7 @@ function openChatContextMenu(e, url, title, folderId) {
       label: "שינוי השם",
       icon: "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z",
       action: "Rename",
+      nativeAction: "rename",
     },
     {
       label: "מחיקה",
@@ -981,22 +990,36 @@ const observerCallback = (mutations) => {
     domUpdateTimer = setTimeout(() => {
       injectFoldersUI();
       hideMovedChats();
-      refreshObserverTargets();
+      maybeRefreshObserverTargets();
     }, 150);
   }
 };
 
 const menuObserver = new MutationObserver(observerCallback);
+const OBSERVER_ROOT_SELECTORS = [
+  ".cdk-overlay-container",
+  ".gems-list-container",
+  "conversation-list",
+  "div.project-grid-container",
+  "project-grid",
+];
+let observerRootSignature = null;
 
-function refreshObserverTargets() {
+function getObserverRootsAndSignature() {
+  const roots = [];
+  const signatureParts = [];
+  OBSERVER_ROOT_SELECTORS.forEach((sel) => {
+    const root = document.querySelector(sel);
+    if (root) {
+      roots.push(root);
+      signatureParts.push(sel);
+    }
+  });
+  return { roots, signature: signatureParts.join("|") };
+}
+
+function refreshObserverTargets(roots) {
   menuObserver.disconnect();
-  const roots = [
-    document.querySelector(".cdk-overlay-container"),
-    document.querySelector(".gems-list-container"),
-    document.querySelector("conversation-list"),
-    document.querySelector("div.project-grid-container"),
-    document.querySelector("project-grid"),
-  ].filter(Boolean);
 
   if (roots.length === 0) {
     menuObserver.observe(document.body, { childList: true, subtree: true });
@@ -1008,7 +1031,15 @@ function refreshObserverTargets() {
   });
 }
 
+function maybeRefreshObserverTargets() {
+  const { roots, signature } = getObserverRootsAndSignature();
+  if (signature !== observerRootSignature) {
+    observerRootSignature = signature;
+    refreshObserverTargets(roots);
+  }
+}
+
 // Initial run
-refreshObserverTargets();
+maybeRefreshObserverTargets();
 injectFoldersUI();
 hideMovedChats();
