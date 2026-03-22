@@ -5,9 +5,11 @@ Gemini & NotebookLM Folders is a lightweight, productivity-focused browser exten
 ## Preview
 
 Gemini Folders Preview:
+
 ![Gemini Folders Extension Preview](preview.png)
 
 NotebookLM Folders Preview:
+
 ![NotebookLM Folders Extension Preview](previewNoteBook.png)
 
 ## ✨ Features
