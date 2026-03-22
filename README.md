@@ -2,6 +2,14 @@
 
 Gemini & NotebookLM Folders is a lightweight, productivity-focused browser extension designed to provide hierarchical organization for Google Gemini conversational histories and Google NotebookLM projects. This extension integrates a custom, color-coded folder system directly into the native Google Material Design interface.
 
+## Preview
+
+Gemini Folders Preview:
+![Gemini Folders Extension Preview](preview.png)
+
+NotebookLM Folders Preview:
+![NotebookLM Folders Extension Preview](previewNoteBook.png)
+
 ## ✨ Features
 
 Seamless Native Integration: The UI is designed to blend perfectly with Google's native interfaces, interacting safely with Angular Material (CDK) DOM elements to maintain stability during site updates.
