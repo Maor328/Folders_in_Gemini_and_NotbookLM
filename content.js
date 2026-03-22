@@ -6,6 +6,11 @@ const overlays = {
   deleteModal: null,
 };
 let lastContextChat = null;
+// Stores the URL of the chat whose ⋮ button was most recently clicked.
+// Set on mousedown of any button inside a sidebar row — before the CDK menu
+// opens — so addFolderOptionToMenu always knows the exact source chat.
+let lastMenuTriggerUrl = null;
+let lastMenuTriggerTitle = null;
 let isMainSectionOpen = false;
 
 // Normalize any Gemini chat href (absolute OR relative) to just the path.
@@ -13,17 +18,21 @@ let isMainSectionOpen = false;
 // and sometimes relative like /app/ID — this handles both uniformly.
 function chatPath(href) {
   if (!href) return "";
+  let path = "";
   try {
     // Remove query string then extract pathname for absolute URLs
     const url = new URL(href, window.location.origin);
-    return url.pathname; // e.g. "/app/22610c776770c88d"
+    path = url.pathname; // e.g. "/app/22610c776770c88d"
   } catch {
-    return href.split("?")[0];
+    path = href.split("?")[0];
   }
+  // Remove trailing slash to ensure consistent matching
+  return path.endsWith("/") ? path.slice(0, -1) : path;
 }
 
 // CSS selector that matches chat links whether href is relative or absolute
-const CHAT_LINK_SEL = 'a[href*="/app/"]';
+// Using multiple selectors for resilience against DOM changes
+const CHAT_LINK_SEL = 'a[href*="/app/"], a[href^="/app/"], a[href*="gemini.google.com/app/"]';
 
 chrome.storage.local.get(["geminiFolders"], function (result) {
   if (result.geminiFolders) {
@@ -39,10 +48,18 @@ chrome.storage.local.get(["geminiFolders"], function (result) {
 function saveFolders() {
   // Render immediately (synchronous) so the UI updates without waiting
   // for the async storage write to complete.
-  renderFolders();
   try {
-    chrome.storage.local.set({ geminiFolders: myFolders });
+    renderFolders();
+    chrome.storage.local.set({
+      geminiFolders: myFolders
+    }, function(result) {
+      // Log error if storage fails silently
+      if (chrome.runtime.lastError) {
+        console.error('[Gemini Folders] Storage error:', chrome.runtime.lastError.message);
+      }
+    });
   } catch (e) {
+    console.error('[Gemini Folders] Save error:', e);
     if (!e.message?.includes("Extension context invalidated")) throw e;
   }
 }
@@ -203,7 +220,7 @@ function showRenameFolderModal(folder) {
             </div>
         </div>`;
   document.body.appendChild(modal);
-  overlays.createModal = modal;
+  overlays.deleteModal = modal;
 
   const input = document.getElementById("rename-folder-input");
   if (input) {
@@ -246,7 +263,7 @@ function showRenameChatModal(url, oldTitle) {
             </div>
         </div>`;
   document.body.appendChild(modal);
-  overlays.createModal = modal;
+  overlays.deleteModal = modal;
 
   const input = document.getElementById("rename-chat-input");
   if (input) {
@@ -260,7 +277,7 @@ function showRenameChatModal(url, oldTitle) {
     if (newTitle) {
       myFolders.forEach((f) =>
         f.chats.forEach((c) => {
-          if (c.url === url) c.title = newTitle;
+          if (chatPath(c.url) === chatPath(url)) c.title = newTitle;
         }),
       );
       saveFolders();
@@ -300,7 +317,7 @@ function showRemoveChatModal(url, folderId) {
   const doRemove = () => {
     const f = myFolders.find((f) => f.id === folderId);
     if (f) {
-      f.chats = f.chats.filter((c) => c.url !== url);
+      f.chats = f.chats.filter((c) => chatPath(c.url) !== chatPath(url));
       saveFolders();
     }
     closeAllOverlays();
@@ -390,7 +407,7 @@ function openFolderSelectionMenu(x, y, url, title) {
     item.innerHTML = `<span style="flex-grow:1; text-align:right; font-family:'Google Sans'; font-size:14px;">${f.name}</span><svg width="18" height="18" style="fill: ${f.color};" viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>`;
     item.onclick = (e) => {
       e.stopPropagation();
-      if (!f.chats.find((c) => c.url === url)) {
+      if (!f.chats.find((c) => chatPath(c.url) === chatPath(url))) {
         f.chats.push({ title, url });
         saveFolders();
       }
@@ -480,8 +497,6 @@ function openChatContextMenu(e, url, title, folderId) {
       closeAllOverlays();
 
       if (opt.action === "remove") {
-        // Show confirmation modal instead of removing immediately
-        closeAllOverlays();
         showRemoveChatModal(url, folderId);
         return;
       }
@@ -712,65 +727,63 @@ function injectFoldersUI() {
 function addFolderOptionToMenu(container, anchorItem) {
   if (!anchorItem) return;
 
-  const trigger = document.querySelector('[aria-expanded="true"]');
-  const triggerContainer = trigger
-    ? trigger.closest(".navigation-item, li")
-    : null;
+  let currentUrl = null;
+  let currentTitle = null;
 
-  let frozenUrl = "";
-  let frozenTitle = "";
-  let frozenFolder = null;
+  // 1. Determine the menu context.
+  //
+  // lastMenuTriggerUrl is set on mousedown of any ⋮ button in a sidebar row
+  // (including hidden rows belonging to folders), so it always points to the
+  // exact chat whose menu just opened.
+  //
+  // If it is null the menu was opened from the App Header ⋮ (not a sidebar
+  // row), so we fall back to window.location for the current chat.
 
-  if (triggerContainer) {
-    // Strategy 1: The trigger is inside a sidebar item. Find its associated link.
-    const link = triggerContainer.querySelector(CHAT_LINK_SEL);
-    if (link && !link.closest("#gemini-custom-folders")) {
-      frozenUrl = chatPath(link.getAttribute("href"));
-      frozenTitle = link.textContent.trim();
-    } else if (lastContextChat?.url) {
-      // Fallback to hover state tracking
-      frozenUrl = lastContextChat.url;
-      frozenTitle = lastContextChat.title;
-    }
-  } else {
-    // Strategy 2: The trigger is NOT in the sidebar (e.g., top-left 3-dots menu).
-    // This menu applies to the currently active chat.
-    if (window.location.pathname.includes("/app/")) {
-      frozenUrl = chatPath(window.location.href);
-      // Try to find the title from the active sidebar item
-      const activeLinks = Array.from(document.querySelectorAll(CHAT_LINK_SEL));
-      const activeLink = activeLinks.find(
-        (a) =>
-          !a.closest("#gemini-custom-folders") &&
-          chatPath(a.getAttribute("href")) === frozenUrl,
-      );
+  if (lastMenuTriggerUrl) {
+    // Sidebar row menu — use the pre-recorded trigger URL then clear it
+    currentUrl = lastMenuTriggerUrl;
+    currentTitle = lastMenuTriggerTitle || "";
+    lastMenuTriggerUrl = null;
+    lastMenuTriggerTitle = null;
+  } else if (window.location.pathname.includes("/app/")) {
+    // App Header menu — derive from the open chat URL
+    currentUrl = chatPath(window.location.href);
 
-      if (activeLink) {
-        frozenTitle = activeLink.textContent.trim();
-      } else {
-        frozenTitle =
-          document.title.replace(" - Gemini", "").trim() || "Current Chat";
-      }
-    } else if (lastContextChat?.url) {
-      frozenUrl = lastContextChat.url;
-      frozenTitle = lastContextChat.title;
+    // Title: try visible sidebar link → folder storage → document.title
+    const sidebarLink = Array.from(
+      document.querySelectorAll(CHAT_LINK_SEL),
+    ).find(
+      (a) =>
+        !a.closest("#gemini-custom-folders") &&
+        chatPath(a.getAttribute("href")) === currentUrl,
+    );
+
+    if (sidebarLink) {
+      currentTitle = sidebarLink.textContent.trim();
+    } else {
+      let folderTitle = null;
+      myFolders.forEach((f) => {
+        const match = f.chats.find((c) => chatPath(c.url) === currentUrl);
+        if (match) folderTitle = match.title;
+      });
+      currentTitle =
+        folderTitle ||
+        document.title.replace(" - Gemini", "").trim() ||
+        "Current Chat";
     }
   }
 
-  // Recalculate folder membership in case strategy 2 or 3 found the URL,
-  // or lastContextChat was missing fromFolder
-  if (frozenUrl) {
-    let belongsTo = null;
-    myFolders.forEach((folder) => {
-      if (folder.chats.some((c) => chatPath(c.url) === frozenUrl)) {
-        belongsTo = folder.id;
-      }
-    });
-    frozenFolder = belongsTo;
-  }
+  if (!currentUrl) return;
 
-  const isFromFolder = !!frozenFolder;
+  // 2. Identify if this chat belongs to any folder
+  let belongsToFolderId = null;
+  myFolders.forEach((folder) => {
+    if (folder.chats.some((c) => chatPath(c.url) === currentUrl)) {
+      belongsToFolderId = folder.id;
+    }
+  });
 
+  const isFromFolder = !!belongsToFolderId;
   const newItem = anchorItem.cloneNode(true);
   newItem.classList.add("custom-folder-option");
   newItem.removeAttribute("onclick");
@@ -778,25 +791,32 @@ function addFolderOptionToMenu(container, anchorItem) {
   const icon = isFromFolder
     ? "M19 13H5v-2h14v2z"
     : "M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z";
-  newItem.innerHTML = `<div class="mat-mdc-menu-item-icon" style="display:flex; align-items:center;"><svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24" style="margin-left: 10px;"><path d="${icon}"/></svg></div><span class="mat-mdc-menu-item-text" style="flex-grow:1; text-align:right; font-family:'Google Sans' !important; font-size:14px !important;">${isFromFolder ? "הסר מהתיקייה" : "הוסף לתיקייה"}</span>`;
+
+  newItem.innerHTML = `
+    <div class="mat-mdc-menu-item-icon" style="display:flex; align-items:center;">
+        <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24" style="margin-left: 10px;">
+            <path d="${icon}"/>
+        </svg>
+    </div>
+    <span class="mat-mdc-menu-item-text" style="flex-grow:1; text-align:right; font-family:'Google Sans' !important; font-size:14px !important;">
+        ${isFromFolder ? "הסר מהתיקייה" : "הוסף לתיקייה"}
+    </span>`;
 
   newItem.addEventListener("click", (e) => {
-    e.stopPropagation(); // prevent CDK and mousedown handler from interfering
+    e.stopPropagation();
     const x = e.clientX;
     const y = e.clientY;
 
     if (isFromFolder) {
-      const f = myFolders.find((folder) => folder.id === frozenFolder);
-      if (f) {
-        f.chats = f.chats.filter((c) => c.url !== frozenUrl);
-        saveFolders();
-      }
+      // Show confirmation modal instead of removing immediately
+      closeAllOverlays();
+      // Also close the native menu
       document.querySelector(".cdk-overlay-backdrop")?.click();
+      showRemoveChatModal(currentUrl, belongsToFolderId);
       return;
     }
 
-    if (!frozenUrl) return;
-    openFolderSelectionMenu(x, y, frozenUrl, frozenTitle);
+    openFolderSelectionMenu(x, y, currentUrl, currentTitle);
   });
 
   anchorItem.insertAdjacentElement("afterend", newItem);
@@ -825,6 +845,40 @@ document.addEventListener(
     const container = chatLink
       ? chatLink.closest(".navigation-item") || chatLink.parentElement
       : e.target.closest(".navigation-item") || e.target.closest("li");
+
+    // Detect ⋮ button clicks inside sidebar rows (including hidden ones)
+    // and record the exact URL before the CDK menu opens.
+    const btn = e.target.closest("button");
+    if (btn && !btn.closest("#gemini-custom-folders")) {
+      // Gemini's sidebar uses Angular components — the chat row is wrapped in
+      // .conversation-actions-container (not a plain li or navigation-item).
+      // Find the single-chat wrapper (.conversation-items-container) that
+      // contains this button, then grab its chat link directly.
+      // This is the tightest possible scope — we never cross into a sibling
+      // chat's container, and hidden rows are skipped automatically because
+      // their wrapper also carries gemini-hidden-chat.
+      const chatWrapper =
+        btn.closest(".conversation-items-container") ||
+        btn.closest(".navigation-item") ||
+        btn.closest("li");
+
+      if (
+        chatWrapper &&
+        !chatWrapper.classList.contains("gemini-hidden-chat")
+      ) {
+        // Look for the link inside the wrapper OR as a direct sibling element
+        const link =
+          chatWrapper.querySelector(CHAT_LINK_SEL) ||
+          chatWrapper.parentElement?.querySelector(`:scope > ${CHAT_LINK_SEL}`);
+        if (link) {
+          const urlAttr = link.getAttribute("href");
+          if (urlAttr) {
+            lastMenuTriggerUrl = chatPath(urlAttr);
+            lastMenuTriggerTitle = link.textContent.trim();
+          }
+        }
+      }
+    }
 
     if (container && !container.closest("#gemini-custom-folders")) {
       const link =
@@ -896,6 +950,8 @@ document.addEventListener(
 );
 
 let domUpdateTimer = null;
+let menuObserver = null;
+
 const observerCallback = (mutations) => {
   // Menu detection logic for adding our folder option
   for (const mutation of mutations) {
@@ -952,8 +1008,30 @@ const observerCallback = (mutations) => {
   }, 100);
 };
 
-const menuObserver = new MutationObserver(observerCallback);
-menuObserver.observe(document.body, { childList: true, subtree: true });
+// Initialize observer after a short delay to avoid premature attachment
+setTimeout(() => {
+  menuObserver = new MutationObserver(observerCallback);
+  menuObserver.observe(document.body, { childList: true, subtree: true });
+}, 500);
+
+// Cleanup function for extension context invalidation
+function cleanupObservers() {
+  if (domUpdateTimer) {
+    clearTimeout(domUpdateTimer);
+    domUpdateTimer = null;
+  }
+  if (menuObserver) {
+    menuObserver.disconnect();
+    menuObserver = null;
+  }
+}
+
+// Listen for extension context invalidation
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message === 'extensionContextInvalidated') {
+    cleanupObservers();
+  }
+});
 
 // Initial run
 injectFoldersUI();

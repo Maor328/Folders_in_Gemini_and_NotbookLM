@@ -42,16 +42,39 @@ const NB_CARD_SEL = "project-button";
 const NB_MENU_BTN_SEL = "button.project-button-more";
 
 /** Selectors tried in order to locate the notebook list/grid container.
- *  The folder panel is injected immediately before the first match. */
+ *  The folder panel is injected immediately before the first match.
+ *  Extended with many fallbacks to handle NotebookLM DOM changes. */
 const NB_TABLE_CONTAINER_SELS = [
+  // Custom Angular elements (most specific — try first)
   "project-grid",
+  "notebook-list",
+  "notebooks-list",
+  "project-list",
+  // Container divs
   "div.project-grid-container",
+  "div.notebook-list-container",
+  "div.notebooks-container",
+  "div.grid-container",
+  // Angular Material table variants
   "mat-table",
   "[mat-table]",
   ".mat-mdc-table",
   ".mdc-data-table__table",
+  // Standard HTML table
   "table[role='table']",
+  "table[role='grid']",
   "table",
+  // Angular Material tab body (notebook list lives inside a tab)
+  "mat-tab-body-content",
+  ".mat-tab-body-content",
+  ".mat-mdc-tab-body-content",
+  "mat-tab-body",
+  ".mat-tab-body",
+  // Role-based fallbacks
+  "[role='tabpanel']",
+  "[role='grid']",
+  "[role='list']",
+  "[role='table']",
 ];
 
 /** Selectors tried in order for NotebookLM's native action-menu panel.
@@ -269,12 +292,19 @@ function closeAllOverlays() {
 // ---------------------------------------------------------------------------
 
 function hideMovedNotebooks() {
+  // Safety guard: don't hide notebooks if our panel isn't in the DOM.
+  // Without the panel, the user would have no way to access the hidden notebooks.
+  if (!document.getElementById("nblm-custom-folders")) return;
+
   const movedTitles = new Set(
     nlmFolders.flatMap((f) => f.notebooks.map((n) => n.title)),
   );
 
-  // List view — hide table rows
-  document.querySelectorAll(NB_ROW_SEL).forEach((row) => {
+  // List view — hide table rows (with multiple selector fallbacks)
+  const allRows = Array.from(
+    document.querySelectorAll('tr[role="row"], div[role="row"], [role="row"]'),
+  );
+  allRows.forEach((row) => {
     if (row.closest("#nblm-custom-folders")) return;
     const { title } = getNotebookDetails(row);
     if (!title) return;
@@ -282,7 +312,14 @@ function hideMovedNotebooks() {
   });
 
   // Grid view — hide project-button cards
-  document.querySelectorAll(NB_CARD_SEL).forEach((card) => {
+  // NOTE: Keep selectors conservative — avoid broad matches like button:not([role="tab"])
+  // or [class*="card"] which can accidentally hide unrelated UI elements.
+  const allCards = Array.from(
+    document.querySelectorAll(
+      'project-button, [class*="project-card"], [class*="notebook-card"]',
+    ),
+  );
+  allCards.forEach((card) => {
     if (card.closest("#nblm-custom-folders")) return;
     const { title } = getNotebookDetails(card);
     if (!title) return;
@@ -469,15 +506,19 @@ function showRenameNotebookModal(oldTitle) {
         }),
       );
       saveFolders();
-      
+
       // 2. Trigger "Real Rename" if the notebook is on screen or by switching tabs
-      performNativeAction(oldTitle, 'rename', newTitle);
+      performNativeAction(oldTitle, "rename", newTitle);
     }
     closeAllOverlays();
   };
-  
-  document.getElementById("nblm-confirm-rename")?.addEventListener("click", confirm);
-  document.getElementById("nblm-cancel-rename")?.addEventListener("click", closeAllOverlays);
+
+  document
+    .getElementById("nblm-confirm-rename")
+    ?.addEventListener("click", confirm);
+  document
+    .getElementById("nblm-cancel-rename")
+    ?.addEventListener("click", closeAllOverlays);
   input?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") confirm();
     if (e.key === "Escape") closeAllOverlays();
@@ -492,81 +533,184 @@ function showRenameNotebookModal(oldTitle) {
  * @param {string} [newValue] - New title for rename action.
  */
 async function performNativeAction(oldTitle, action, newValue = "") {
+  console.log(
+    `[NBLM Folders] Starting native action: ${action} for "${oldTitle}"`,
+  );
   let entry = findNotebookEntryByTitle(oldTitle);
 
   // 1. Try switching tabs if not found
   if (!entry) {
-    const tabs = Array.from(document.querySelectorAll('button, [role="tab"], .mat-mdc-tab'));
-    const otherTab = tabs.find(t => {
+    const tabs = Array.from(
+      document.querySelectorAll(
+        'button, [role="tab"], .mat-mdc-tab, .mat-tab-label, .mdc-tab',
+      ),
+    );
+    const otherTab = tabs.find((t) => {
       const txt = t.textContent.toLowerCase();
-      // Logic: if it's likely the other tab, click it
-      if (action === 'remove-shared') {
+      const isActive =
+        t.classList.contains("mat-mdc-tab-active") ||
+        t.getAttribute("aria-selected") === "true";
+      if (isActive) return false;
+
+      if (action === "remove-shared") {
         return txt.includes("shared") || txt.includes("שותפו");
       }
-      return txt.includes("my notebooks") || txt.includes("המחברות שלי") || txt.includes("shared") || txt.includes("שותפו");
+      return (
+        txt.includes("my notebooks") ||
+        txt.includes("המחברות שלי") ||
+        txt.includes("shared") ||
+        txt.includes("שותפו")
+      );
     });
 
     if (otherTab) {
+      console.log(
+        `[NBLM Folders] Notebook not in view. Switching tab: ${otherTab.textContent.trim()}`,
+      );
       otherTab.click();
-      await new Promise(r => setTimeout(r, 800));
-      entry = findNotebookEntryByTitle(oldTitle);
+
+      // Poll for the entry to appear instead of hard timeout
+      let attempts = 0;
+      while (!entry && attempts < 20) {
+        await new Promise((r) => setTimeout(r, 250));
+        entry = findNotebookEntryByTitle(oldTitle);
+        attempts++;
+      }
     }
   }
 
-  if (!entry) return;
+  if (!entry) {
+    console.warn(
+      `[NBLM Folders] Could not find notebook entry for "${oldTitle}" after tab switch.`,
+    );
+    return;
+  }
+
+  console.log(
+    `[NBLM Folders] Found entry for "${oldTitle}". Opening native menu...`,
+  );
 
   // 2. Click native menu
-  const menuBtn = entry.querySelector(NB_MENU_BTN_SEL) || 
-                  entry.querySelector('button[aria-haspopup="menu"], button.mat-mdc-menu-trigger');
-  if (!menuBtn) return;
+  const menuBtn =
+    entry.querySelector(NB_MENU_BTN_SEL) ||
+    entry.querySelector(
+      'button[aria-haspopup="menu"], button.mat-mdc-menu-trigger',
+    );
+  if (!menuBtn) {
+    console.error(
+      `[NBLM Folders] Could not find menu button for entry.`,
+      entry,
+    );
+    return;
+  }
+
+  menuBtn.scrollIntoView({ block: "center" });
   menuBtn.click();
-  await new Promise(r => setTimeout(r, 200));
+
+  // Wait for native menu to render
+  let menuItems = [];
+  let attempts = 0;
+  while (menuItems.length === 0 && attempts < 10) {
+    await new Promise((r) => setTimeout(r, 100));
+    menuItems = Array.from(
+      document.querySelectorAll('.mat-mdc-menu-item, [role="menuitem"]'),
+    );
+    attempts++;
+  }
 
   // 3. Find the correct menu option
-  const menuItems = Array.from(document.querySelectorAll('.mat-mdc-menu-item, [role="menuitem"]'));
   let opt = null;
-  if (action === 'rename') {
-    opt = menuItems.find(i => {
+  if (action === "rename") {
+    opt = menuItems.find((i) => {
       const t = i.textContent.toLowerCase();
       return t.includes("rename") || t.includes("עריכת") || t.includes("שינוי");
     });
-  } else if (action === 'delete') {
-    opt = menuItems.find(i => i.textContent.includes("מחיקה") || i.textContent.toLowerCase().includes("delete"));
-  } else if (action === 'remove-shared') {
-    opt = menuItems.find(i => i.textContent.includes("הסרת") || i.textContent.toLowerCase().includes("remove"));
+  } else if (action === "delete") {
+    opt = menuItems.find(
+      (i) =>
+        i.textContent.includes("מחיקה") ||
+        i.textContent.toLowerCase().includes("delete"),
+    );
+  } else if (action === "remove-shared") {
+    opt = menuItems.find(
+      (i) =>
+        i.textContent.includes("הסרת") ||
+        i.textContent.toLowerCase().includes("remove"),
+    );
   }
 
-  if (!opt) return;
+  if (!opt) {
+    console.error(
+      `[NBLM Folders] Could not find native menu option for: ${action}`,
+    );
+    return;
+  }
+
+  console.log(
+    `[NBLM Folders] Clicking native option: ${opt.textContent.trim()}`,
+  );
   opt.click();
-  await new Promise(r => setTimeout(r, 400));
 
   // 4. Handle native dialogs
-  if (action === 'rename') {
-    const nativeInput = document.querySelector('mat-dialog-container input, .mat-mdc-dialog-container input');
+  attempts = 0;
+  let dialog = null;
+  while (!dialog && attempts < 10) {
+    await new Promise((r) => setTimeout(r, 200));
+    dialog = document.querySelector(
+      "mat-dialog-container, .mat-mdc-dialog-container",
+    );
+    attempts++;
+  }
+
+  if (!dialog) {
+    console.error(`[NBLM Folders] Native dialog did not appear.`);
+    return;
+  }
+
+  if (action === "rename") {
+    const nativeInput = dialog.querySelector("input");
     if (nativeInput) {
+      console.log(`[NBLM Folders] Filling native rename input: ${newValue}`);
       nativeInput.value = newValue;
-      nativeInput.dispatchEvent(new Event('input', { bubbles: true }));
-      const saveBtn = Array.from(document.querySelectorAll('mat-dialog-container button, .mat-mdc-dialog-container button'))
-        .find(b => b.textContent.includes("שמירה") || b.textContent.toLowerCase().includes("save"));
-      if (saveBtn) saveBtn.click();
+      nativeInput.dispatchEvent(new Event("input", { bubbles: true }));
+
+      const saveBtn = Array.from(dialog.querySelectorAll("button")).find(
+        (b) =>
+          b.textContent.includes("שמירה") ||
+          b.textContent.toLowerCase().includes("save"),
+      );
+
+      if (saveBtn) {
+        console.log(`[NBLM Folders] Clicking native Save button.`);
+        saveBtn.click();
+      }
     }
   } else {
     // Delete / Remove confirmation dialog
-    const confirmBtn = Array.from(document.querySelectorAll('mat-dialog-container button, .mat-mdc-dialog-container button'))
-      .find(b => 
-        b.textContent.includes("מחיקה") || 
-        b.textContent.includes("הסרה") || 
-        b.textContent.toLowerCase().includes("delete") || 
-        b.textContent.toLowerCase().includes("remove")
-      );
-    if (confirmBtn) confirmBtn.click();
+    const confirmBtn = Array.from(dialog.querySelectorAll("button")).find(
+      (b) =>
+        b.textContent.includes("מחיקה") ||
+        b.textContent.includes("הסרה") ||
+        b.textContent.toLowerCase().includes("delete") ||
+        b.textContent.toLowerCase().includes("remove"),
+    );
+    if (confirmBtn) {
+      console.log(`[NBLM Folders] Clicking native Confirm button.`);
+      confirmBtn.click();
+    }
   }
+  console.log(`[NBLM Folders] Native action ${action} completed.`);
 }
 
 function findNotebookEntryByTitle(title) {
-  const allEntries = Array.from(document.querySelectorAll(`${NB_ROW_SEL}, ${NB_CARD_SEL}`));
+  const allEntries = Array.from(
+    document.querySelectorAll(`${NB_ROW_SEL}, ${NB_CARD_SEL}`),
+  );
   return allEntries.find((el) => {
-    return !el.closest("#nblm-custom-folders") && getNotebookDetails(el).title === title;
+    return (
+      !el.closest("#nblm-custom-folders") &&
+      getNotebookDetails(el).title === title
+    );
   });
 }
 
@@ -574,20 +718,43 @@ function findNotebookEntryByTitle(title) {
 // MODALS — Remove notebook from folder
 // ---------------------------------------------------------------------------
 
-function showRemoveNotebookModal(title, folderId) {
+function showRemoveNotebookModal(
+  title,
+  folderId,
+  isShared = false,
+  nativeAction = null,
+) {
   closeAllOverlays();
   const modal = document.createElement("div");
   modal.className = "folder-modal-overlay";
   modal.setAttribute("tabindex", "-1");
-  modal.innerHTML = `
-    <div class="folder-modal">
-      <h2 style="color:white;margin:0 0 16px;font-size:24px;font-weight:400;">הסרה מהתיקייה?</h2>
-      <p style="color:#c4c7c5;margin:0 0 24px;font-size:14px;">המחברת תחזור לרשימה הראשית.</p>
-      <div style="display:flex;flex-direction:row-reverse;gap:12px;">
-        <button class="confirm-btn-blue" id="nblm-confirm-remove">הסרה</button>
-        <button class="cancel-btn-plain" id="nblm-cancel-remove">ביטול</button>
-      </div>
-    </div>`;
+
+  if (isShared) {
+    // Layout matching Native Image 1
+    modal.innerHTML = `
+      <div class="folder-modal" style="width:500px; padding: 40px 24px 24px;">
+        <div class="folder-modal-close-x" id="nblm-cancel-remove-x">
+          <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </div>
+        <h2 style="font-size:18px; line-height:1.4; margin-bottom: 32px; font-weight: 400;">להסיר את ה-notebook? הוא יוסר מרשימת קובצי ה-notebook המשותפים אבל לא יימחק מה-notebook הבסיסי.</h2>
+        <div style="display:flex; flex-direction:row-reverse; gap:12px; justify-content:flex-start;">
+          <button class="remove-btn-vibrant" id="nblm-confirm-remove">הסרה</button>
+          <button class="cancel-btn-plain" style="border:1px solid #8e918f" id="nblm-cancel-remove">ביטול</button>
+        </div>
+      </div>`;
+  } else {
+    // Layout matching Native Image 2
+    modal.innerHTML = `
+      <div class="folder-modal" style="width:360px; text-align:center;">
+        <h2 style="color:white; margin:0 0 16px; font-size:32px; font-weight:400;">הסרה מהתיקייה?</h2>
+        <p style="color:#c4c7c5; margin:0 0 24px; font-size:16px;">המחברת תחזור לרשימה הראשית.</p>
+        <div style="display:flex; flex-direction:row-reverse; gap:12px; justify-content:center;">
+          <button class="confirm-btn-blue" style="background:#a8c7fa; color:#062e6f; padding: 12px 32px;" id="nblm-confirm-remove">הסרה</button>
+          <button class="cancel-btn-plain" style="color:#a8c7fa; padding: 12px 32px;" id="nblm-cancel-remove">ביטול</button>
+        </div>
+      </div>`;
+  }
+
   document.body.appendChild(modal);
   overlays.deleteModal = modal;
   modal.focus();
@@ -595,22 +762,30 @@ function showRemoveNotebookModal(title, folderId) {
   const doRemove = () => {
     const f = nlmFolders.find((f) => f.id === folderId);
     if (f) f.notebooks = f.notebooks.filter((n) => n.title !== title);
-    
-    // Crucial: reset the tracked context so the menu flips back
-    // from "Remove from folder" to "Add to folder" immediately
+
     if (lastContextNotebook && lastContextNotebook.title === title) {
       lastContextNotebook.fromFolder = null;
     }
-    
+
     saveFolders();
     closeAllOverlays();
+
+    // Now trigger the native Backend sync ONLY if requested
+    if (nativeAction) {
+      performNativeAction(title, nativeAction);
+    }
   };
+
   document
     .getElementById("nblm-cancel-remove")
     ?.addEventListener("click", closeAllOverlays);
   document
+    .getElementById("nblm-cancel-remove-x")
+    ?.addEventListener("click", closeAllOverlays);
+  document
     .getElementById("nblm-confirm-remove")
     ?.addEventListener("click", doRemove);
+
   modal.addEventListener("keydown", (e) => {
     if (e.key === "Enter") doRemove();
     if (e.key === "Escape") closeAllOverlays();
@@ -751,15 +926,17 @@ function openNotebookContextMenu(e, title, folderId) {
   });
 
   const menuBtn = entry
-    ? (entry.querySelector(NB_MENU_BTN_SEL) ||
-       entry.querySelector('button[aria-haspopup="menu"], button.mat-mdc-menu-trigger'))
+    ? entry.querySelector(NB_MENU_BTN_SEL) ||
+      entry.querySelector(
+        'button[aria-haspopup="menu"], button.mat-mdc-menu-trigger',
+      )
     : null;
 
   if (!entry || !menuBtn) {
     // Determine role from storage if not in DOM
     let role = "";
-    nlmFolders.forEach(f => {
-      const nb = f.notebooks.find(n => n.title === title);
+    nlmFolders.forEach((f) => {
+      const nb = f.notebooks.find((n) => n.title === title);
       if (nb) role = nb.role || "";
     });
 
@@ -767,61 +944,74 @@ function openNotebookContextMenu(e, title, folderId) {
 
     const menu = document.createElement("div");
     menu.className = "folder-dropdown";
-    
+
     // Build options based on role
     const options = [];
-    
+
     if (!isReader) {
       options.push({
         id: "fb-delete",
         label: "מחיקה",
-        icon: "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
+        icon: "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z",
       });
     } else {
       options.push({
         id: "fb-remove-shared",
         label: "הסרת ה-Notebook",
-        icon: "M19 13H5v-2h14v2z"
+        icon: "M19 13H5v-2h14v2z",
       });
     }
 
     options.push({
       id: "fb-remove-folder",
       label: "הסר מהתיקייה שלי",
-      icon: "M19 13H5v-2h14v2z" // Note: NLM uses a minus/remove icon for this
+      icon: "M19 13H5v-2h14v2z", // Note: NLM uses a minus/remove icon for this
     });
 
     if (!isReader) {
       options.push({
         id: "fb-rename",
         label: "עריכת השם",
-        icon: "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
+        icon: "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z",
       });
     }
 
-    options.push({
-      id: "fb-report",
-      label: "דיווח על Notebook",
-      icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"
-    });
+    if (isReader) {
+      options.push({
+        id: "fb-report",
+        label: "דיווח על Notebook",
+        icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z",
+      });
+    }
 
-    menu.innerHTML = options.map(opt => `
+    menu.innerHTML = options
+      .map(
+        (opt) => `
       <div class="folder-dropdown-item" id="${opt.id}">
         <span style="flex-grow:1;text-align:right;">${opt.label}</span>
         <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="${opt.icon}"/></svg>
       </div>
-    `).join("");
+    `,
+      )
+      .join("");
 
     document.body.appendChild(menu);
     overlays.dropdown = menu;
 
+    // Use CDK overlay container if available for consistent stacking context
+    const cdkOverlay = document.querySelector(".cdk-overlay-container");
+    if (cdkOverlay && cdkOverlay.parentNode) {
+      cdkOverlay.insertAdjacentElement("afterend", menu);
+    }
+
+    // Safety: use ?. to prevent "Cannot read properties of null" if menu updates rapidly
     menu.querySelector("#fb-rename")?.addEventListener("click", (ev) => {
       ev.stopPropagation();
       closeAllOverlays();
       showRenameNotebookModal(title);
     });
 
-    menu.querySelector("#fb-remove-folder").addEventListener("click", (ev) => {
+    menu.querySelector("#fb-remove-folder")?.addEventListener("click", (ev) => {
       ev.stopPropagation();
       closeAllOverlays();
       showRemoveNotebookModal(title, folderId);
@@ -830,22 +1020,18 @@ function openNotebookContextMenu(e, title, folderId) {
     menu.querySelector("#fb-delete")?.addEventListener("click", (ev) => {
       ev.stopPropagation();
       closeAllOverlays();
-      // Remove from our local folder first
-      showRemoveNotebookModal(title, folderId);
-      // Then trigger the native delete flow (tab switching etc.)
-      performNativeAction(title, 'delete');
+      // "Delete" applies to Owner notebooks, so isShared=false, nativeAction='delete'
+      showRemoveNotebookModal(title, folderId, false, "delete");
     });
 
     menu.querySelector("#fb-remove-shared")?.addEventListener("click", (ev) => {
       ev.stopPropagation();
       closeAllOverlays();
-      // Remove from our local folder first
-      showRemoveNotebookModal(title, folderId);
-      // Then trigger the native remove-shared flow
-      performNativeAction(title, 'remove-shared');
+      // This is for Shared notebooks (Reader), isShared=true, nativeAction='remove-shared'
+      showRemoveNotebookModal(title, folderId, true, "remove-shared");
     });
 
-    menu.querySelector("#fb-report").addEventListener("click", (ev) => {
+    menu.querySelector("#fb-report")?.addEventListener("click", (ev) => {
       ev.stopPropagation();
       closeAllOverlays();
       window.open("https://support.google.com/legal/answer/3110420", "_blank");
@@ -853,12 +1039,12 @@ function openNotebookContextMenu(e, title, folderId) {
 
     const mw = 220;
     const menuHeight = options.length * 44;
-    let top = e.clientY - 10;
+    let top = e.clientY - 20;
     if (top + menuHeight > window.innerHeight)
       top = window.innerHeight - menuHeight - 20;
 
     menu.style.top = `${top}px`;
-    menu.style.left = `${clampLeft(e.clientX - 10, mw)}px`;
+    menu.style.left = `${clampLeft(e.clientX - 20, mw)}px`;
     return;
   }
 
@@ -872,6 +1058,7 @@ function openNotebookContextMenu(e, title, folderId) {
     fromFolder: folderId,
   };
 
+  // 1. Snapshot the original state — we briefly move the row to the cursor
   const wasHidden = entry.classList.contains("nblm-hidden-notebook");
   const originalCssText = entry.style.cssText;
 
@@ -879,20 +1066,24 @@ function openNotebookContextMenu(e, title, folderId) {
     entry.classList.remove("nblm-hidden-notebook");
   }
 
-  // Make the entire native row/card fixed exactly where the user clicked, but invisible.
-  // This tricks Angular CDK into opening the native menu directly under the mouse!
-  // We offset it slightly so the menu doesn't spawn right under the cursor and cause accidental clicks.
+  // 2. Measure the button relative to its row so we can align the BUTTON to the click
+  const entryRect = entry.getBoundingClientRect();
+  const btnRect = menuBtn.getBoundingClientRect();
+  const offsetLeft = btnRect.left - entryRect.left;
+  const offsetTop = btnRect.top - entryRect.top;
+
+  // 3. Move the row so the button is exactly under the cursor (invisible to user)
   entry.style.cssText += `
     position: fixed !important;
-    top: ${e.clientY - 10}px !important;
-    left: ${e.clientX - 50}px !important;
+    top: ${e.clientY - offsetTop}px !important;
+    left: ${e.clientX - offsetLeft}px !important;
     opacity: 0 !important;
     pointer-events: none !important;
     z-index: 2147483647 !important;
-    width: 200px !important;
+    width: ${entryRect.width}px !important;
   `;
 
-  // Trigger the native NLM menu!
+  // 4. Trigger the native NLM menu!
   menuBtn.click();
 
   // Restore everything after Angular CDK has had a chance to measure and open (usually 1-2 frames)
@@ -950,7 +1141,7 @@ function injectFolderOptionIntoNativeMenu(menuContainer) {
     if (isFromFolder) {
       // Close the native menu first
       document.querySelector(".cdk-overlay-backdrop")?.click();
-      
+
       // Show confirmation modal before removing
       if (details && details.title) {
         showRemoveNotebookModal(details.title, folderId);
@@ -1089,7 +1280,11 @@ function renderFolders() {
         const targetTitle = btn.dataset.title;
 
         // Try list view first (span.project-table-title)
-        const allSpans = Array.from(document.querySelectorAll(NB_TITLE_SEL));
+        const allSpans = Array.from(
+          document.querySelectorAll(
+            'span.project-table-title, span[role="title"], span[title], [class*="title"], [class*="name"]',
+          ),
+        );
         const titleSpan = allSpans.find(
           (span) =>
             !span.closest("#nblm-custom-folders") &&
@@ -1107,7 +1302,11 @@ function renderFolders() {
         }
 
         // Try grid view (project-button card — click its primary action button)
-        const allCards = Array.from(document.querySelectorAll(NB_CARD_SEL));
+        const allCards = Array.from(
+          document.querySelectorAll(
+            'project-button, button.primary-action-button, [class*="card"][role="button"], button[class*="action"]',
+          ),
+        );
         const card = allCards.find(
           (c) =>
             !c.closest("#nblm-custom-folders") &&
@@ -1144,27 +1343,68 @@ function renderFolders() {
 function injectFoldersUI() {
   if (document.getElementById("nblm-custom-folders")) return;
 
-  // Find the notebook table and insert our panel directly above it
   let anchor = null;
+  let insertMethod = "beforebegin";
+
+  // ── Step 1: specific notebook-grid/table selectors (beforebegin) ──────────
   for (const sel of NB_TABLE_CONTAINER_SELS) {
-    anchor = document.querySelector(sel);
-    if (anchor) break;
+    const el = document.querySelector(sel);
+    if (el && !el.closest("#nblm-custom-folders")) {
+      anchor = el;
+      break;
+    }
   }
-  if (!anchor) return;
+
+  // ── Step 2: active Angular Material tab panel (afterbegin) ───────────────
+  // NLM wraps notebook lists inside a mat-tab-body; only the active one is
+  // visible. We inject at the very top of its scrollable content area.
+  if (!anchor) {
+    const activePanelSels = [
+      ".mat-mdc-tab-body-active .mat-mdc-tab-body-content",
+      ".mat-tab-body-active .mat-tab-body-content",
+      ".mat-mdc-tab-body-active",
+      ".mat-tab-body-active",
+      "[role='tabpanel']:not([aria-hidden='true'])",
+      "[role='tabpanel']",
+    ];
+    for (const sel of activePanelSels) {
+      const el = document.querySelector(sel);
+      if (el && !el.closest("#nblm-custom-folders")) {
+        anchor = el;
+        insertMethod = "afterbegin";
+        break;
+      }
+    }
+  }
+
+  // ── Step 3: give up rather than inject in the wrong place ─────────────────
+  if (!anchor) {
+    document._nblmPanelInjected = false;
+    return;
+  }
 
   const panel = document.createElement("div");
   panel.id = "nblm-custom-folders";
   panel.innerHTML = `
     <div id="nblm-folders-header" class="${isMainSectionOpen ? "is-open" : ""}">
-      <h3 id="nblm-folders-title">התיקיות שלי</h3>
-      <button id="nblm-add-folder-btn">+ הוספת תיקייה</button>
-      <div id="nblm-folders-arrow">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      <div id="nblm-folders-title-row">
+        <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24" style="color:#a8c7fa;flex-shrink:0;"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
+        <h3 id="nblm-folders-title">התיקיות שלי</h3>
+      </div>
+      <div id="nblm-folders-header-actions">
+        <button id="nblm-add-folder-btn">
+          <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          תיקייה חדשה
+        </button>
+        <div id="nblm-folders-arrow">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
       </div>
     </div>
     <div id="nblm-folders-list" class="${isMainSectionOpen ? "open" : ""}"></div>`;
 
-  anchor.insertAdjacentElement("beforebegin", panel);
+  anchor.insertAdjacentElement(insertMethod, panel);
+  document._nblmPanelInjected = true;
 
   document
     .getElementById("nblm-folders-header")
@@ -1272,8 +1512,15 @@ const nbObserver = new MutationObserver((mutations) => {
   if (nbDomTimer) clearTimeout(nbDomTimer);
   nbDomTimer = setTimeout(() => {
     injectFoldersUI();
-    // Skip the DOM walk entirely when there are no folders to hide
-    if (nlmFolders.length > 0) hideMovedNotebooks();
+    // Only hide notebooks after the panel is confirmed in the DOM.
+    // This prevents the "blank page" bug where notebooks are hidden
+    // but the folder panel failed to inject (e.g., due to DOM changes).
+    if (
+      nlmFolders.length > 0 &&
+      document.getElementById("nblm-custom-folders")
+    ) {
+      hideMovedNotebooks();
+    }
   }, 300);
 });
 
@@ -1284,7 +1531,9 @@ window.addEventListener("load", () => {
   nbObserver.observe(document.body, { childList: true, subtree: true });
   // One-time initial run after load
   injectFoldersUI();
-  if (nlmFolders.length > 0) hideMovedNotebooks();
+  if (nlmFolders.length > 0 && document.getElementById("nblm-custom-folders")) {
+    hideMovedNotebooks();
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -1295,5 +1544,7 @@ if (document.readyState === "complete") {
   // Script injected after load event already fired
   nbObserver.observe(document.body, { childList: true, subtree: true });
   injectFoldersUI();
-  if (nlmFolders.length > 0) hideMovedNotebooks();
+  if (nlmFolders.length > 0 && document.getElementById("nblm-custom-folders")) {
+    hideMovedNotebooks();
+  }
 }

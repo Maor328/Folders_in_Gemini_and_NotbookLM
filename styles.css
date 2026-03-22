@@ -140,7 +140,10 @@
   padding: 8px 0;
   z-index: 200000;
   min-width: 200px;
-  box-shadow: 0 5px 5px -3px rgba(0,0,0,.2), 0 8px 10px 1px rgba(0,0,0,.14), 0 3px 14px 2px rgba(0,0,0,.12);
+  box-shadow:
+    0 5px 5px -3px rgba(0, 0, 0, 0.2),
+    0 8px 10px 1px rgba(0, 0, 0, 0.14),
+    0 3px 14px 2px rgba(0, 0, 0, 0.12);
   font-family: Roboto, "Google Sans", sans-serif !important;
 }
 
@@ -176,7 +179,8 @@
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -184,33 +188,57 @@
 }
 
 .folder-modal {
-  background: #282a2c;
+  background: #1e2124;
   border-radius: 28px;
-  padding: 24px;
-  width: 360px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  padding: 32px 28px 28px;
+  width: 380px;
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.07);
   font-family: Roboto, "Google Sans", sans-serif;
   direction: rtl;
+  position: relative;
+}
+
+.folder-modal-close-x {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  cursor: pointer;
+  color: #c4c7c5;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 50%;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.folder-modal-close-x:hover {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .folder-modal h2 {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 400;
-  margin-top: 0;
+  margin: 0 0 20px;
   color: #e3e3e3;
   text-align: right;
+  line-height: 1.3;
 }
 
 .folder-modal p {
   font-size: 14px;
-  color: #c4c7c5;
+  color: #9aa0a6;
   margin-bottom: 24px;
   text-align: right;
+  line-height: 1.6;
 }
 
 .folder-modal .input-wrapper {
   position: relative;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
 }
 
 .folder-modal label {
@@ -219,57 +247,101 @@
   right: 12px;
   font-size: 11px;
   color: #a8c7fa;
-  background: #282a2c;
+  background: #1e2124;
   padding: 0 4px;
   z-index: 1;
+  letter-spacing: 0.03em;
 }
 
 .folder-modal input {
   width: 100%;
-  background: transparent;
-  border: 1px solid #8e918f;
-  border-radius: 4px;
-  padding: 12px;
-  color: white;
-  font-size: 16px;
-  margin-bottom: 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 14px 14px;
+  color: #e3e3e3;
+  font-size: 15px;
+  margin-bottom: 24px;
   outline: none;
   box-sizing: border-box;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+  text-align: right;
+  direction: rtl;
+}
+
+.folder-modal input::placeholder {
+  color: #5f6368;
 }
 
 .folder-modal input:focus {
-  border: 2px solid #a8c7fa;
-  padding: 11px;
+  border-color: #a8c7fa;
+  background: rgba(168, 199, 250, 0.05);
+}
+
+/* Force buttons to the right side of the modal */
+.folder-modal > div:last-child {
+  justify-content: flex-start !important;
+  flex-direction: row-reverse !important;
 }
 
 .confirm-btn-blue {
-  background-color: #a8c7fa !important;
-  color: #062e6f !important;
-  border-radius: 20px;
-  padding: 10px 24px;
-  font-weight: 500;
+  background: #4a8af4;
+  color: #ffffff;
   border: none;
+  border-radius: 100px;
+  padding: 11px 28px;
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s;
+  letter-spacing: 0.01em;
+  transition:
+    background 0.2s,
+    box-shadow 0.2s;
 }
 
 .confirm-btn-blue:hover {
-  background-color: #c2d7ff !important;
+  background: #5e9bf5;
+  box-shadow: 0 2px 12px rgba(74, 138, 244, 0.4);
 }
 
 .cancel-btn-plain {
-  background: none;
-  border: none;
+  background: transparent;
   color: #a8c7fa;
-  cursor: pointer;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 100px;
+  padding: 11px 28px;
+  font-size: 14px;
   font-weight: 500;
-  padding: 10px 24px;
-  border-radius: 20px;
-  transition: background 0.2s;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
 }
 
 .cancel-btn-plain:hover {
   background: rgba(168, 199, 250, 0.08);
+  border-color: rgba(168, 199, 250, 0.3);
+}
+
+.remove-btn-vibrant {
+  background: #4a8af4;
+  color: white;
+  border: none;
+  border-radius: 100px;
+  padding: 11px 28px;
+  font-size: 14px;
+  cursor: pointer;
+  font-weight: 500;
+  transition:
+    background 0.2s,
+    box-shadow 0.2s;
+}
+
+.remove-btn-vibrant:hover {
+  background: #5e9bf5;
+  box-shadow: 0 2px 12px rgba(74, 138, 244, 0.4);
 }
 
 /* ============================================================
@@ -400,107 +472,188 @@ body.gemini-action-in-progress .cdk-overlay-backdrop {
               NOTEBOOKLM — site-specific rules
 ============================================================ */
 
-/* Wrapper panel injected above the notebook table.
-   Matches NLM's own card style: dark surface, subtle border, rounded. */
+/* ── Main panel ─────────────────────────────────────────────
+   Flows naturally inside the active tab panel, matching the
+   width and rhythm of NotebookLM's own content sections.    */
 #nblm-custom-folders {
-  width: 75%;
-  max-width: 700px;
-  min-width: 320px;
+  width: 100%;
   box-sizing: border-box;
-  padding: 4px 0 8px;
-  margin: 0 auto 24px;
-  border-radius: 12px;
-  background: #1e2022;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0;
+  margin: 0 0 8px;
   font-family: "Google Sans", sans-serif !important;
   direction: rtl;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Panel header row */
+/* ── Panel header row ────────────────────────────────────── */
 #nblm-folders-header {
   display: flex;
   flex-direction: row;
   align-items: center;
-  padding: 10px 16px;
+  justify-content: space-between;
+  padding: 20px 24px 20px;
   cursor: pointer;
-  border-radius: 10px 10px 0 0;
+  user-select: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   transition: background-color 0.2s;
-  gap: 8px;
+  gap: 12px;
 }
 
 #nblm-folders-header:hover {
-  background-color: rgba(255, 255, 255, 0.05) !important;
+  background-color: rgba(255, 255, 255, 0.03) !important;
 }
 
-/* Thin separator between header and open folder list */
-#nblm-folders-header.is-open {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+/* ── Left cluster: icon + title ─────────────────────────── */
+#nblm-folders-title-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
 }
 
 #nblm-folders-title {
   margin: 0;
-  font-size: 15px;
-  font-weight: 500;
+  font-size: 22px;
+  font-weight: 400;
   color: #e3e3e3;
-  flex-grow: 0;
-  text-align: right;
   white-space: nowrap;
+  letter-spacing: 0;
 }
 
-/* "Add folder" button */
+/* ── Right cluster: add button + chevron ────────────────── */
+#nblm-folders-header-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+/* "New folder" pill button */
 #nblm-add-folder-btn {
-  background-color: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #e3e3e3 !important;
-  cursor: pointer;
-  height: 30px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  border-radius: 15px;
-  padding: 0 14px;
+  gap: 6px;
+  background: rgba(168, 199, 250, 0.12);
+  border: 1px solid rgba(168, 199, 250, 0.25);
+  color: #a8c7fa !important;
+  cursor: pointer;
+  height: 34px;
+  border-radius: 17px;
+  padding: 0 16px;
   font-family: "Google Sans", sans-serif;
-  font-size: 12px;
-  transition: all 0.2s ease;
-  flex-grow: 1;
-  max-width: fit-content;
-  margin: 0 auto 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
   white-space: nowrap;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
 }
 
 #nblm-add-folder-btn:hover {
-  background-color: rgba(255, 255, 255, 0.13) !important;
-  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(168, 199, 250, 0.2) !important;
+  border-color: rgba(168, 199, 250, 0.4);
 }
 
-/* Chevron arrow that rotates when the panel is open */
+/* Chevron arrow */
 #nblm-folders-arrow {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.3s ease;
-  color: #c4c7c5;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: #9aa0a6;
+  transition:
+    transform 0.3s ease,
+    background 0.2s;
+  flex-shrink: 0;
+}
+
+#nblm-folders-arrow:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 #nblm-folders-header.is-open #nblm-folders-arrow {
   transform: rotate(180deg);
 }
 
-/* Extra inner padding when the folder list is visible */
-#nblm-folders-list.open {
-  padding: 6px 8px 4px;
+/* ── Open state separator ────────────────────────────────── */
+#nblm-folders-header.is-open {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 
-/* Notebook hidden from the main table/grid — it lives inside a folder */
+/* ── Folder list container ───────────────────────────────── */
+#nblm-folders-list.open {
+  padding: 12px 16px 16px;
+}
+
+/* ── Folder item row ─────────────────────────────────────── */
+/* Override shared .custom-folder-item for NLM */
+#nblm-custom-folders .custom-folder-item {
+  padding: 10px 14px;
+  border-radius: 10px;
+  margin-bottom: 2px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid transparent;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+}
+
+#nblm-custom-folders .custom-folder-item:hover {
+  background: rgba(255, 255, 255, 0.07) !important;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+#nblm-custom-folders .custom-folder-item.is-open {
+  background: rgba(168, 199, 250, 0.06);
+  border-color: rgba(168, 199, 250, 0.15);
+}
+
+#nblm-custom-folders .folder-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: #e3e3e3;
+}
+
+/* ── Notebooks table inside an open folder ───────────────── */
+#nblm-custom-folders .folder-chats {
+  padding-right: 0;
+  margin-top: 4px;
+}
+
+#nblm-custom-folders .folder-chats.open {
+  padding: 0 6px 8px;
+}
+
+/* Column header row */
+#nblm-custom-folders .nblm-table-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  padding: 6px 12px 8px !important;
+  margin-bottom: 4px !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+/* Notebook rows */
+#nblm-custom-folders .folder-chat-item {
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 1px 0;
+  transition: background 0.15s;
+}
+
+#nblm-custom-folders .folder-chat-item:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* ── Hidden notebook rows/cards (moved into a folder) ─────── */
 .nblm-hidden-notebook {
   display: none !important;
 }
 
-/* Temporarily reveals a hidden table row off-screen so Angular CDK can
-   process programmatic clicks (same pattern as gemini-temp-reveal).
-   display:table-row is required for <tr> elements.
-   NOTE: No visibility:hidden or pointer-events:none — those block Angular
-   event processing. The element is invisible to users via position alone. */
+/* ── Off-screen reveal for Angular CDK click processing ───── */
 .nblm-temp-reveal {
   position: fixed !important;
   top: -9999px !important;
@@ -508,10 +661,7 @@ body.gemini-action-in-progress .cdk-overlay-backdrop {
   display: table-row !important;
 }
 
-/* "הוסף לתיקייה שלי" / "הסר מהתיקייה שלי" — injected into NLM's
-   native ⋮ menu. NLM renders its menu items as LTR flex rows even
-   when the content is Hebrew, so we match that layout (row, not
-   row-reverse) and use direction:rtl only on the text span. */
+/* ── "Add to / Remove from folder" injected into NLM's menu ─ */
 .nblm-folder-option {
   display: flex;
   flex-direction: row;
@@ -529,7 +679,7 @@ body.gemini-action-in-progress .cdk-overlay-backdrop {
   background-color: rgba(255, 255, 255, 0.08);
 }
 
-/* Folder-selection sub-menu must sit above NLM's own overlay stack */
+/* Folder-selection sub-menu — highest z-index */
 .folder-dropdown.nblm-top {
   z-index: 2147483647 !important;
 }
