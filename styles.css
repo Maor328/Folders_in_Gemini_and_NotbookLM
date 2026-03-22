@@ -683,3 +683,75 @@ body.gemini-action-in-progress .cdk-overlay-backdrop {
 .folder-dropdown.nblm-top {
   z-index: 2147483647 !important;
 }
+
+/* ============================================================
+   LTR OVERRIDES — applied when the page language is English.
+   The JS sets `body.gf-ltr` automatically when !_isRTL.
+   Every rule here mirrors a Hebrew-specific rule above and
+   flips it for left-to-right layout.
+   ============================================================ */
+
+/* ── Shared: folder name & chat title alignment ──────────── */
+body.gf-ltr .folder-name {
+  text-align: left;
+}
+
+body.gf-ltr .chat-title-btn {
+  text-align: left;
+}
+
+/* ── Shared: dropdown items — icon left, text left ───────── */
+body.gf-ltr .folder-dropdown-item {
+  flex-direction: row;
+  text-align: left;
+}
+
+/* ── Shared: modal card ──────────────────────────────────── */
+body.gf-ltr .folder-modal {
+  direction: ltr;
+}
+
+body.gf-ltr .folder-modal h2 {
+  text-align: left;
+}
+
+body.gf-ltr .folder-modal p {
+  text-align: left;
+}
+
+/* Input field: natural LTR typing */
+body.gf-ltr .folder-modal input {
+  direction: ltr;
+  text-align: left;
+}
+
+/* Floating label: move from right edge to left edge */
+body.gf-ltr .folder-modal label {
+  right: auto;
+  left: 12px;
+}
+
+/* Button row: primary button on the left, cancel on the right */
+body.gf-ltr .folder-modal > div:last-child {
+  flex-direction: row !important;
+}
+
+/* ── Gemini: panel & header ──────────────────────────────── */
+body.gf-ltr #gemini-custom-folders {
+  direction: ltr;
+}
+
+body.gf-ltr #main-folders-header h3 {
+  text-align: left;
+}
+
+/* CDK overlay: must NOT be forced RTL on English pages,
+   or Google's own native menus will render mirrored.        */
+body.gf-ltr .cdk-overlay-container {
+  direction: ltr;
+}
+
+/* ── NotebookLM: panel ───────────────────────────────────── */
+body.gf-ltr #nblm-custom-folders {
+  direction: ltr;
+}

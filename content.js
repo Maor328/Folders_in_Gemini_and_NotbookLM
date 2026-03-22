@@ -1,3 +1,49 @@
+// ─── i18n: detect page language (Hebrew vs. English) ────────────────────────
+// Google sets the <html lang="he"> / <html lang="iw"> attribute for Hebrew pages.
+// We check this first; if absent we fall back to the browser's UI language.
+const _isRTL = /^(he|iw)\b/i.test(
+  document.documentElement.lang || navigator.language || "",
+);
+const _DIR = {
+  flex: _isRTL ? "row-reverse" : "row",
+  align: _isRTL ? "right" : "left",
+};
+
+// Apply LTR override class to body so CSS overrides kick in for English UI
+if (!_isRTL) document.body.classList.add("gf-ltr");
+
+const T = {
+  myFolders: _isRTL ? "התיקיות שלי" : "My Folders",
+  addFolder: _isRTL ? "+ הוספת תיקייה" : "+ Add Folder",
+  folderNameLabel: _isRTL ? "שם תיקייה:" : "Folder name:",
+  folderNamePh: _isRTL ? "הזן שם לתיקייה..." : "Enter folder name...",
+  confirm: _isRTL ? "אישור" : "Confirm",
+  cancel: _isRTL ? "ביטול" : "Cancel",
+  deleteFolderTitle: _isRTL ? "למחוק את התיקייה?" : "Delete folder?",
+  deleteFolderBody: _isRTL
+    ? "מחיקת התיקייה לא תמחק את השיחות שבתוכה."
+    : "Deleting the folder will not delete the chats inside it.",
+  deleteBtn: _isRTL ? "מחיקה" : "Delete",
+  renameFolderTitle: _isRTL ? "שינוי שם תיקייה:" : "Rename folder:",
+  renameChatTitle: _isRTL ? "שינוי שם שיחה:" : "Rename chat:",
+  removeFromFolderTitle: _isRTL ? "הסרה מהתיקייה?" : "Remove from folder?",
+  removeFromFolderBody: _isRTL
+    ? "השיחה תחזור לרשימת השיחות הרגילה."
+    : "The chat will return to the regular chat list.",
+  removeBtn: _isRTL ? "הסרה" : "Remove",
+  unpin: _isRTL ? "הסר הצמדה" : "Unpin",
+  pinFolder: _isRTL ? "הצמד תיקייה" : "Pin folder",
+  renameFolder: _isRTL ? "שינוי שם" : "Rename",
+  deleteFolder: _isRTL ? "מחק תיקייה" : "Delete folder",
+  noFolders: _isRTL ? "אין תיקיות עדיין" : "No folders yet",
+  shareChat: _isRTL ? "שיתוף השיחה" : "Share chat",
+  renameChat: _isRTL ? "שינוי השם" : "Rename",
+  deleteChat: _isRTL ? "מחיקה" : "Delete",
+  removeFromFolder: _isRTL ? "הסר מהתיקייה" : "Remove from folder",
+  addToFolder: _isRTL ? "הוסף לתיקייה" : "Add to folder",
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 let myFolders = [];
 const overlays = {
   dropdown: null,
@@ -32,7 +78,8 @@ function chatPath(href) {
 
 // CSS selector that matches chat links whether href is relative or absolute
 // Using multiple selectors for resilience against DOM changes
-const CHAT_LINK_SEL = 'a[href*="/app/"], a[href^="/app/"], a[href*="gemini.google.com/app/"]';
+const CHAT_LINK_SEL =
+  'a[href*="/app/"], a[href^="/app/"], a[href*="gemini.google.com/app/"]';
 
 chrome.storage.local.get(["geminiFolders"], function (result) {
   if (result.geminiFolders) {
@@ -50,16 +97,22 @@ function saveFolders() {
   // for the async storage write to complete.
   try {
     renderFolders();
-    chrome.storage.local.set({
-      geminiFolders: myFolders
-    }, function(result) {
-      // Log error if storage fails silently
-      if (chrome.runtime.lastError) {
-        console.error('[Gemini Folders] Storage error:', chrome.runtime.lastError.message);
-      }
-    });
+    chrome.storage.local.set(
+      {
+        geminiFolders: myFolders,
+      },
+      function (result) {
+        // Log error if storage fails silently
+        if (chrome.runtime.lastError) {
+          console.error(
+            "[Gemini Folders] Storage error:",
+            chrome.runtime.lastError.message,
+          );
+        }
+      },
+    );
   } catch (e) {
-    console.error('[Gemini Folders] Save error:', e);
+    console.error("[Gemini Folders] Save error:", e);
     if (!e.message?.includes("Extension context invalidated")) throw e;
   }
 }
@@ -131,11 +184,11 @@ function showCreateFolderModal() {
   modal.className = "folder-modal-overlay";
   modal.innerHTML = `
         <div class="folder-modal">
-            <h2 style="color:white; margin:0 0 16px; font-size:24px; font-weight:400;">שם תיקייה:</h2>
-            <input type="text" id="new-folder-name-input" placeholder="הזן שם לתיקייה..." autocomplete="off" spellcheck="false">
-            <div style="display:flex; flex-direction: row-reverse; gap:12px;">
-                <button class="confirm-btn-blue" id="confirm-create-folder">אישור</button>
-                <button class="cancel-btn-plain" id="cancel-create-folder">ביטול</button>
+            <h2 style="color:white; margin:0 0 16px; font-size:24px; font-weight:400;">${T.folderNameLabel}</h2>
+            <input type="text" id="new-folder-name-input" placeholder="${T.folderNamePh}" autocomplete="off" spellcheck="false">
+            <div style="display:flex; flex-direction:${_DIR.flex}; gap:12px;">
+                <button class="confirm-btn-blue" id="confirm-create-folder">${T.confirm}</button>
+                <button class="cancel-btn-plain" id="cancel-create-folder">${T.cancel}</button>
             </div>
         </div>`;
   document.body.appendChild(modal);
@@ -180,11 +233,11 @@ function showDeleteFolderModal(folder) {
   modal.setAttribute("tabindex", "-1");
   modal.innerHTML = `
         <div class="folder-modal">
-            <h2 style="color:white; margin:0 0 16px; font-size:24px; font-weight:400;">למחוק את התיקייה?</h2>
-            <p style="color:#c4c7c5; margin:0 0 24px; font-size:14px;">מחיקת התיקייה לא תמחק את השיחות שבתוכה.</p>
-            <div style="display:flex; flex-direction: row-reverse; gap:12px;">
-                <button class="confirm-btn-blue" id="confirm-del">מחיקה</button>
-                <button class="cancel-btn-plain" id="cancel-del">ביטול</button>
+            <h2 style="color:white; margin:0 0 16px; font-size:24px; font-weight:400;">${T.deleteFolderTitle}</h2>
+            <p style="color:#c4c7c5; margin:0 0 24px; font-size:14px;">${T.deleteFolderBody}</p>
+            <div style="display:flex; flex-direction:${_DIR.flex}; gap:12px;">
+                <button class="confirm-btn-blue" id="confirm-del">${T.deleteBtn}</button>
+                <button class="cancel-btn-plain" id="cancel-del">${T.cancel}</button>
             </div>
         </div>`;
   document.body.appendChild(modal);
@@ -212,11 +265,11 @@ function showRenameFolderModal(folder) {
   modal.className = "folder-modal-overlay";
   modal.innerHTML = `
         <div class="folder-modal">
-            <h2 style="color:white; margin:0 0 16px; font-size:24px; font-weight:400;">שינוי שם תיקייה:</h2>
+            <h2 style="color:white; margin:0 0 16px; font-size:24px; font-weight:400;">${T.renameFolderTitle}</h2>
             <input type="text" id="rename-folder-input" autocomplete="off" spellcheck="false">
-            <div style="display:flex; flex-direction: row-reverse; gap:12px;">
-                <button class="confirm-btn-blue" id="confirm-rename-folder">אישור</button>
-                <button class="cancel-btn-plain" id="cancel-rename-folder">ביטול</button>
+            <div style="display:flex; flex-direction:${_DIR.flex}; gap:12px;">
+                <button class="confirm-btn-blue" id="confirm-rename-folder">${T.confirm}</button>
+                <button class="cancel-btn-plain" id="cancel-rename-folder">${T.cancel}</button>
             </div>
         </div>`;
   document.body.appendChild(modal);
@@ -255,11 +308,11 @@ function showRenameChatModal(url, oldTitle) {
   modal.className = "folder-modal-overlay";
   modal.innerHTML = `
         <div class="folder-modal">
-            <h2 style="color:white; margin:0 0 16px; font-size:24px; font-weight:400;">שינוי שם שיחה:</h2>
+            <h2 style="color:white; margin:0 0 16px; font-size:24px; font-weight:400;">${T.renameChatTitle}</h2>
             <input type="text" id="rename-chat-input" autocomplete="off" spellcheck="false">
-            <div style="display:flex; flex-direction: row-reverse; gap:12px;">
-                <button class="confirm-btn-blue" id="confirm-rename">אישור</button>
-                <button class="cancel-btn-plain" id="cancel-rename">ביטול</button>
+            <div style="display:flex; flex-direction:${_DIR.flex}; gap:12px;">
+                <button class="confirm-btn-blue" id="confirm-rename">${T.confirm}</button>
+                <button class="cancel-btn-plain" id="cancel-rename">${T.cancel}</button>
             </div>
         </div>`;
   document.body.appendChild(modal);
@@ -303,11 +356,11 @@ function showRemoveChatModal(url, folderId) {
   modal.setAttribute("tabindex", "-1");
   modal.innerHTML = `
         <div class="folder-modal">
-            <h2 style="color:white; margin:0 0 16px; font-size:24px; font-weight:400;">הסרה מהתיקייה?</h2>
-            <p style="color:#c4c7c5; margin:0 0 24px; font-size:14px;">השיחה תחזור לרשימת השיחות הרגילה.</p>
-            <div style="display:flex; flex-direction: row-reverse; gap:12px;">
-                <button class="confirm-btn-blue" id="confirm-remove">הסרה</button>
-                <button class="cancel-btn-plain" id="cancel-remove">ביטול</button>
+            <h2 style="color:white; margin:0 0 16px; font-size:24px; font-weight:400;">${T.removeFromFolderTitle}</h2>
+            <p style="color:#c4c7c5; margin:0 0 24px; font-size:14px;">${T.removeFromFolderBody}</p>
+            <div style="display:flex; flex-direction:${_DIR.flex}; gap:12px;">
+                <button class="confirm-btn-blue" id="confirm-remove">${T.removeBtn}</button>
+                <button class="cancel-btn-plain" id="cancel-remove">${T.cancel}</button>
             </div>
         </div>`;
   document.body.appendChild(modal);
@@ -350,15 +403,15 @@ function openFolderOptions(e, folder) {
   menu.className = "folder-dropdown";
   menu.style.cssText = `position: fixed; background: #282a2c; border-radius: 12px; padding: 8px 0; z-index: 10001; min-width: 160px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); font-family: 'Google Sans', sans-serif;`;
 
-  const pinLabel = folder.isPinned ? "הסר הצמדה" : "הצמד תיקייה";
+  const pinLabel = folder.isPinned ? T.unpin : T.pinFolder;
   const pinIconPath = folder.isPinned
     ? "M19 13H5v-2h14v2z"
     : "M16 9V4l1-1V2H7v1l1 1v5l-2 2v2h5v7l1 1 1-1v-7h5v-2l-2-2z";
 
   menu.innerHTML = `
-        <div class="folder-dropdown-item" id="opt-pin"><span style="flex-grow:1; text-align:right;">${pinLabel}</span><svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="${pinIconPath}"/></svg></div>
-        <div class="folder-dropdown-item" id="opt-rename"><span style="flex-grow:1; text-align:right;">שינוי שם</span><svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></div>
-        <div class="folder-dropdown-item" id="opt-delete"><span style="flex-grow:1; text-align:right;">מחק תיקייה</span><svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></div>
+        <div class="folder-dropdown-item" id="opt-pin"><span style="flex-grow:1; text-align:${_DIR.align};">${pinLabel}</span><svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="${pinIconPath}"/></svg></div>
+        <div class="folder-dropdown-item" id="opt-rename"><span style="flex-grow:1; text-align:${_DIR.align};">${T.renameFolder}</span><svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></div>
+        <div class="folder-dropdown-item" id="opt-delete"><span style="flex-grow:1; text-align:${_DIR.align};">${T.deleteFolder}</span><svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></div>
     `;
 
   document.body.appendChild(menu);
@@ -398,13 +451,13 @@ function openFolderSelectionMenu(x, y, url, title) {
   menu.addEventListener("click", (e) => e.stopPropagation());
 
   if (myFolders.length === 0) {
-    menu.innerHTML = `<div class="folder-dropdown-item" style="color: #c4c7c5; justify-content: center;">אין תיקיות עדיין</div>`;
+    menu.innerHTML = `<div class="folder-dropdown-item" style="color: #c4c7c5; justify-content: center;">${T.noFolders}</div>`;
   }
 
   myFolders.forEach((f) => {
     const item = document.createElement("div");
     item.className = "folder-dropdown-item";
-    item.innerHTML = `<span style="flex-grow:1; text-align:right; font-family:'Google Sans'; font-size:14px;">${f.name}</span><svg width="18" height="18" style="fill: ${f.color};" viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>`;
+    item.innerHTML = `<span style="flex-grow:1; text-align:${_DIR.align}; font-family:'Google Sans'; font-size:14px;">${f.name}</span><svg width="18" height="18" style="fill: ${f.color};" viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>`;
     item.onclick = (e) => {
       e.stopPropagation();
       if (!f.chats.find((c) => chatPath(c.url) === chatPath(url))) {
@@ -463,25 +516,25 @@ function openChatContextMenu(e, url, title, folderId) {
 
   const options = [
     {
-      label: "שיתוף השיחה",
+      label: T.shareChat,
       icon: "M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z",
       action: "Share",
       keywords: ["share", "שתף", "שיתוף"],
     },
     {
-      label: "שינוי השם",
+      label: T.renameChat,
       icon: "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z",
       action: "Rename",
       keywords: ["rename", "שנה שם", "שינוי שם"],
     },
     {
-      label: "מחיקה",
+      label: T.deleteChat,
       icon: "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z",
       action: "Delete",
       keywords: ["delete", "מחק", "מחיקה"],
     },
     {
-      label: "הסר מהתיקייה",
+      label: T.removeFromFolder,
       icon: "M19 13H5v-2h14v2z",
       action: "remove",
     },
@@ -490,7 +543,7 @@ function openChatContextMenu(e, url, title, folderId) {
   options.forEach((opt) => {
     const item = document.createElement("div");
     item.className = "folder-dropdown-item";
-    item.innerHTML = `<span style="flex-grow:1; text-align:right; font-size:14px;">${opt.label}</span><svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="${opt.icon}"/></svg>`;
+    item.innerHTML = `<span style="flex-grow:1; text-align:${_DIR.align}; font-size:14px;">${opt.label}</span><svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="${opt.icon}"/></svg>`;
 
     item.onclick = (event) => {
       event.stopPropagation();
@@ -610,7 +663,7 @@ function renderFolders() {
                   .map(
                     (chat) => `
                     <div class="folder-chat-item">
-                        <div class="chat-title-btn" data-url="${chat.url}" style="flex-grow:1; text-align:right; font-size:13px;">${chat.title}</div>
+                        <div class="chat-title-btn" data-url="${chat.url}" style="flex-grow:1; text-align:${_DIR.align}; font-size:13px;">${chat.title}</div>
                         <div class="folder-chat-menu-btn" data-url="${chat.url}" data-title="${chat.title}" data-folder="${folder.id}" style="padding:4px; opacity:0.5;"><svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg></div>
                     </div>`,
                   )
@@ -691,8 +744,8 @@ function injectFoldersUI() {
     div.id = "gemini-custom-folders";
     div.innerHTML = `
             <div id="main-folders-header" class="${isMainSectionOpen ? "is-open" : ""}">
-                <h3 id="main-folders-title">התיקיות שלי</h3>
-                <button id="add-folder-btn">+ הוספת תיקייה</button>
+                <h3 id="main-folders-title">${T.myFolders}</h3>
+                <button id="add-folder-btn">${T.addFolder}</button>
                 <div id="main-folders-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></div>
             </div>
             <div id="folders-list" class="${isMainSectionOpen ? "open" : ""}"></div>
@@ -798,8 +851,8 @@ function addFolderOptionToMenu(container, anchorItem) {
             <path d="${icon}"/>
         </svg>
     </div>
-    <span class="mat-mdc-menu-item-text" style="flex-grow:1; text-align:right; font-family:'Google Sans' !important; font-size:14px !important;">
-        ${isFromFolder ? "הסר מהתיקייה" : "הוסף לתיקייה"}
+    <span class="mat-mdc-menu-item-text" style="flex-grow:1; text-align:${_DIR.align}; font-family:'Google Sans' !important; font-size:14px !important;">
+        ${isFromFolder ? T.removeFromFolder : T.addToFolder}
     </span>`;
 
   newItem.addEventListener("click", (e) => {
@@ -1028,7 +1081,7 @@ function cleanupObservers() {
 
 // Listen for extension context invalidation
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message === 'extensionContextInvalidated') {
+  if (message === "extensionContextInvalidated") {
     cleanupObservers();
   }
 });

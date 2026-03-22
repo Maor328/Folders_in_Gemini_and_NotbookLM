@@ -20,7 +20,61 @@
 //     (via the ⋮ menu → "שינוי שם"). This is a known limitation.
 // ============================================================
 
-"use strict";
+// ─── i18n: detect page language (Hebrew vs. English) ────────────────────────
+const _isRTL = /^(he|iw)\b/i.test(
+  document.documentElement.lang || navigator.language || "",
+);
+const _DIR = {
+  flex: _isRTL ? "row-reverse" : "row",
+  align: _isRTL ? "right" : "left",
+};
+
+// Apply LTR override class to body so CSS overrides kick in for English UI
+if (!_isRTL) document.body.classList.add("gf-ltr");
+
+const T = {
+  myFolders: _isRTL ? "התיקיות שלי" : "My Folders",
+  newFolder: _isRTL ? "תיקייה חדשה" : "New Folder",
+  folderNameLabel: _isRTL ? "שם תיקייה:" : "Folder name:",
+  folderNamePh: _isRTL ? "הזן שם לתיקייה..." : "Enter folder name...",
+  confirm: _isRTL ? "אישור" : "Confirm",
+  cancel: _isRTL ? "ביטול" : "Cancel",
+  deleteFolderTitle: _isRTL ? "למחוק את התיקייה?" : "Delete folder?",
+  deleteFolderBody: _isRTL
+    ? "מחיקת התיקייה לא תמחק את המחברות שבתוכה."
+    : "Deleting the folder will not delete the notebooks inside it.",
+  deleteBtn: _isRTL ? "מחיקה" : "Delete",
+  renameFolderTitle: _isRTL ? "שינוי שם תיקייה:" : "Rename folder:",
+  renameNbTitle: _isRTL ? "שנה את שם ה-Notebook" : "Rename Notebook",
+  renameNbLabel: _isRTL ? "הכותרת של ה-Notebook*" : "Notebook title*",
+  saveBtn: _isRTL ? "שמירה" : "Save",
+  removeSharedTitle: _isRTL
+    ? "להסיר את ה-notebook? הוא יוסר מרשימת קובצי ה-notebook המשותפים אבל לא יימחק מה-notebook הבסיסי."
+    : "Remove this notebook? It will be removed from your shared notebooks list but not deleted from the original.",
+  removeFromFolderTitle: _isRTL ? "הסרה מהתיקייה?" : "Remove from folder?",
+  removeFromFolderBody: _isRTL
+    ? "המחברת תחזור לרשימה הראשית."
+    : "The notebook will return to the main list.",
+  removeBtn: _isRTL ? "הסרה" : "Remove",
+  unpin: _isRTL ? "הסר הצמדה" : "Unpin",
+  pinFolder: _isRTL ? "הצמד תיקייה" : "Pin folder",
+  renameFolder: _isRTL ? "שינוי שם" : "Rename",
+  deleteFolder: _isRTL ? "מחק תיקייה" : "Delete folder",
+  noFolders: _isRTL ? "אין תיקיות עדיין" : "No folders yet",
+  addToMyFolder: _isRTL ? "הוסף לתיקייה שלי" : "Add to my folder",
+  removeFromMyFolder: _isRTL ? "הסר מהתיקייה שלי" : "Remove from my folder",
+  deleteNb: _isRTL ? "מחיקה" : "Delete",
+  removeSharedNb: _isRTL ? "הסרת ה-Notebook" : "Remove notebook",
+  editName: _isRTL ? "עריכת השם" : "Rename",
+  reportNb: _isRTL ? "דיווח על Notebook" : "Report notebook",
+  colTitle: _isRTL ? "שם המחברת" : "Notebook",
+  colSources: _isRTL ? "מקורות" : "Sources",
+  colDate: _isRTL ? "תאריך יצירה" : "Created",
+  colRole: _isRTL ? "תפקיד" : "Role",
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
+("use strict");
 
 // ---------------------------------------------------------------------------
 // SELECTOR CONSTANTS
@@ -183,7 +237,12 @@ function getNotebookDetails(el) {
         text.includes("אפר׳") ||
         text.includes("מרץ") ||
         text.includes("פבר׳") ||
-        text.includes("ינו׳")
+        text.includes("ינו׳") ||
+        // English months (full and abbreviated)
+        /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/.test(text) ||
+        /\b(January|February|March|April|June|July|August|September|October|November|December)\b/.test(
+          text,
+        )
       ) {
         // Only assign if it's not already assigned to sources
         if (!sources || sources !== text) {
@@ -225,7 +284,11 @@ function getNotebookDetails(el) {
         role = text;
       } else if (text.includes("מקורות") || text.includes("sources")) {
         sources = text;
-      } else if (text.match(/\d{4}/) || text.includes("ב-")) {
+      } else if (
+        text.match(/\d{4}/) ||
+        text.includes("ב-") ||
+        /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/.test(text)
+      ) {
         date = text;
       }
     });
@@ -337,11 +400,11 @@ function showCreateFolderModal() {
   modal.className = "folder-modal-overlay";
   modal.innerHTML = `
     <div class="folder-modal">
-      <h2 style="color:white;margin:0 0 16px;font-size:24px;font-weight:400;">שם תיקייה:</h2>
-      <input type="text" id="nblm-new-folder-input" placeholder="הזן שם לתיקייה..." autocomplete="off" spellcheck="false">
-      <div style="display:flex;flex-direction:row-reverse;gap:12px;">
-        <button class="confirm-btn-blue" id="nblm-confirm-create">אישור</button>
-        <button class="cancel-btn-plain" id="nblm-cancel-create">ביטול</button>
+      <h2 style="color:white;margin:0 0 16px;font-size:24px;font-weight:400;">${T.folderNameLabel}</h2>
+      <input type="text" id="nblm-new-folder-input" placeholder="${T.folderNamePh}" autocomplete="off" spellcheck="false">
+      <div style="display:flex;flex-direction:${_DIR.flex};gap:12px;">
+        <button class="confirm-btn-blue" id="nblm-confirm-create">${T.confirm}</button>
+        <button class="cancel-btn-plain" id="nblm-cancel-create">${T.cancel}</button>
       </div>
     </div>`;
   document.body.appendChild(modal);
@@ -389,11 +452,11 @@ function showDeleteFolderModal(folder) {
   modal.setAttribute("tabindex", "-1");
   modal.innerHTML = `
     <div class="folder-modal">
-      <h2 style="color:white;margin:0 0 16px;font-size:24px;font-weight:400;">למחוק את התיקייה?</h2>
-      <p style="color:#c4c7c5;margin:0 0 24px;font-size:14px;">מחיקת התיקייה לא תמחק את המחברות שבתוכה.</p>
-      <div style="display:flex;flex-direction:row-reverse;gap:12px;">
-        <button class="confirm-btn-blue" id="nblm-confirm-del">מחיקה</button>
-        <button class="cancel-btn-plain" id="nblm-cancel-del">ביטול</button>
+      <h2 style="color:white;margin:0 0 16px;font-size:24px;font-weight:400;">${T.deleteFolderTitle}</h2>
+      <p style="color:#c4c7c5;margin:0 0 24px;font-size:14px;">${T.deleteFolderBody}</p>
+      <div style="display:flex;flex-direction:${_DIR.flex};gap:12px;">
+        <button class="confirm-btn-blue" id="nblm-confirm-del">${T.deleteBtn}</button>
+        <button class="cancel-btn-plain" id="nblm-cancel-del">${T.cancel}</button>
       </div>
     </div>`;
   document.body.appendChild(modal);
@@ -427,11 +490,11 @@ function showRenameFolderModal(folder) {
   modal.className = "folder-modal-overlay";
   modal.innerHTML = `
     <div class="folder-modal">
-      <h2 style="color:white;margin:0 0 16px;font-size:24px;font-weight:400;">שינוי שם תיקייה:</h2>
+      <h2 style="color:white;margin:0 0 16px;font-size:24px;font-weight:400;">${T.renameFolderTitle}</h2>
       <input type="text" id="nblm-rename-folder-input" autocomplete="off" spellcheck="false">
-      <div style="display:flex;flex-direction:row-reverse;gap:12px;">
-        <button class="confirm-btn-blue" id="nblm-confirm-rename-folder">אישור</button>
-        <button class="cancel-btn-plain" id="nblm-cancel-rename-folder">ביטול</button>
+      <div style="display:flex;flex-direction:${_DIR.flex};gap:12px;">
+        <button class="confirm-btn-blue" id="nblm-confirm-rename-folder">${T.confirm}</button>
+        <button class="cancel-btn-plain" id="nblm-cancel-rename-folder">${T.cancel}</button>
       </div>
     </div>`;
   document.body.appendChild(modal);
@@ -474,14 +537,14 @@ function showRenameNotebookModal(oldTitle) {
   modal.className = "folder-modal-overlay";
   modal.innerHTML = `
     <div class="folder-modal">
-      <h2 style="margin-bottom:24px;">שנה את שם ה-Notebook</h2>
+      <h2 style="margin-bottom:24px;">${T.renameNbTitle}</h2>
       <div class="input-wrapper">
-        <label>הכותרת של ה-Notebook*</label>
+        <label>${T.renameNbLabel}</label>
         <input type="text" id="nblm-rename-input" autocomplete="off" spellcheck="false">
       </div>
-      <div style="display:flex;flex-direction:row;gap:12px;justify-content:flex-start;margin-top:8px;">
-        <button class="confirm-btn-blue" id="nblm-confirm-rename">שמירה</button>
-        <button class="cancel-btn-plain" id="nblm-cancel-rename">ביטול</button>
+      <div style="display:flex;flex-direction:${_DIR.flex};gap:12px;justify-content:flex-start;margin-top:8px;">
+        <button class="confirm-btn-blue" id="nblm-confirm-rename">${T.saveBtn}</button>
+        <button class="cancel-btn-plain" id="nblm-cancel-rename">${T.cancel}</button>
       </div>
     </div>`;
   document.body.appendChild(modal);
@@ -736,21 +799,21 @@ function showRemoveNotebookModal(
         <div class="folder-modal-close-x" id="nblm-cancel-remove-x">
           <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
         </div>
-        <h2 style="font-size:18px; line-height:1.4; margin-bottom: 32px; font-weight: 400;">להסיר את ה-notebook? הוא יוסר מרשימת קובצי ה-notebook המשותפים אבל לא יימחק מה-notebook הבסיסי.</h2>
-        <div style="display:flex; flex-direction:row-reverse; gap:12px; justify-content:flex-start;">
-          <button class="remove-btn-vibrant" id="nblm-confirm-remove">הסרה</button>
-          <button class="cancel-btn-plain" style="border:1px solid #8e918f" id="nblm-cancel-remove">ביטול</button>
+        <h2 style="font-size:18px; line-height:1.4; margin-bottom: 32px; font-weight: 400;">${T.removeSharedTitle}</h2>
+        <div style="display:flex; flex-direction:${_DIR.flex}; gap:12px; justify-content:flex-start;">
+          <button class="remove-btn-vibrant" id="nblm-confirm-remove">${T.removeBtn}</button>
+          <button class="cancel-btn-plain" style="border:1px solid #8e918f" id="nblm-cancel-remove">${T.cancel}</button>
         </div>
       </div>`;
   } else {
     // Layout matching Native Image 2
     modal.innerHTML = `
       <div class="folder-modal" style="width:360px; text-align:center;">
-        <h2 style="color:white; margin:0 0 16px; font-size:32px; font-weight:400;">הסרה מהתיקייה?</h2>
-        <p style="color:#c4c7c5; margin:0 0 24px; font-size:16px;">המחברת תחזור לרשימה הראשית.</p>
-        <div style="display:flex; flex-direction:row-reverse; gap:12px; justify-content:center;">
-          <button class="confirm-btn-blue" style="background:#a8c7fa; color:#062e6f; padding: 12px 32px;" id="nblm-confirm-remove">הסרה</button>
-          <button class="cancel-btn-plain" style="color:#a8c7fa; padding: 12px 32px;" id="nblm-cancel-remove">ביטול</button>
+        <h2 style="color:white; margin:0 0 16px; font-size:32px; font-weight:400;">${T.removeFromFolderTitle}</h2>
+        <p style="color:#c4c7c5; margin:0 0 24px; font-size:16px;">${T.removeFromFolderBody}</p>
+        <div style="display:flex; flex-direction:${_DIR.flex}; gap:12px; justify-content:center;">
+          <button class="confirm-btn-blue" style="background:#a8c7fa; color:#062e6f; padding: 12px 32px;" id="nblm-confirm-remove">${T.removeBtn}</button>
+          <button class="cancel-btn-plain" style="color:#a8c7fa; padding: 12px 32px;" id="nblm-cancel-remove">${T.cancel}</button>
         </div>
       </div>`;
   }
@@ -804,22 +867,22 @@ function openFolderOptions(e, folder) {
   const menu = document.createElement("div");
   menu.className = "folder-dropdown";
 
-  const pinLabel = folder.isPinned ? "הסר הצמדה" : "הצמד תיקייה";
+  const pinLabel = folder.isPinned ? T.unpin : T.pinFolder;
   const pinPath = folder.isPinned
     ? "M19 13H5v-2h14v2z"
     : "M16 9V4l1-1V2H7v1l1 1v5l-2 2v2h5v7l1 1 1-1v-7h5v-2l-2-2z";
 
   menu.innerHTML = `
     <div class="folder-dropdown-item" id="nblm-opt-pin">
-      <span style="flex-grow:1;text-align:right;">${pinLabel}</span>
+      <span style="flex-grow:1;text-align:${_DIR.align};">${pinLabel}</span>
       <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="${pinPath}"/></svg>
     </div>
     <div class="folder-dropdown-item" id="nblm-opt-rename">
-      <span style="flex-grow:1;text-align:right;">שינוי שם</span>
+      <span style="flex-grow:1;text-align:${_DIR.align};">${T.renameFolder}</span>
       <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
     </div>
     <div class="folder-dropdown-item" id="nblm-opt-delete">
-      <span style="flex-grow:1;text-align:right;">מחק תיקייה</span>
+      <span style="flex-grow:1;text-align:${_DIR.align};">${T.deleteFolder}</span>
       <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
     </div>`;
 
@@ -861,14 +924,14 @@ function openFolderSelectionMenu(x, y, details) {
   menu.addEventListener("click", (e) => e.stopPropagation());
 
   if (nlmFolders.length === 0) {
-    menu.innerHTML = `<div class="folder-dropdown-item" style="color:#c4c7c5;justify-content:center;">אין תיקיות עדיין</div>`;
+    menu.innerHTML = `<div class="folder-dropdown-item" style="color:#c4c7c5;justify-content:center;">${T.noFolders}</div>`;
   }
 
   nlmFolders.forEach((f) => {
     const item = document.createElement("div");
     item.className = "folder-dropdown-item";
     item.innerHTML = `
-      <span style="flex-grow:1;text-align:right;font-size:14px;">${f.name}</span>
+      <span style="flex-grow:1;text-align:${_DIR.align};font-size:14px;">${f.name}</span>
       <svg width="18" height="18" style="fill:${f.color};" viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>`;
     item.onclick = (e) => {
       e.stopPropagation();
@@ -951,27 +1014,27 @@ function openNotebookContextMenu(e, title, folderId) {
     if (!isReader) {
       options.push({
         id: "fb-delete",
-        label: "מחיקה",
+        label: T.deleteNb,
         icon: "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z",
       });
     } else {
       options.push({
         id: "fb-remove-shared",
-        label: "הסרת ה-Notebook",
+        label: T.removeSharedNb,
         icon: "M19 13H5v-2h14v2z",
       });
     }
 
     options.push({
       id: "fb-remove-folder",
-      label: "הסר מהתיקייה שלי",
-      icon: "M19 13H5v-2h14v2z", // Note: NLM uses a minus/remove icon for this
+      label: T.removeFromMyFolder,
+      icon: "M19 13H5v-2h14v2z",
     });
 
     if (!isReader) {
       options.push({
         id: "fb-rename",
-        label: "עריכת השם",
+        label: T.editName,
         icon: "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z",
       });
     }
@@ -979,7 +1042,7 @@ function openNotebookContextMenu(e, title, folderId) {
     if (isReader) {
       options.push({
         id: "fb-report",
-        label: "דיווח על Notebook",
+        label: T.reportNb,
         icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z",
       });
     }
@@ -988,7 +1051,7 @@ function openNotebookContextMenu(e, title, folderId) {
       .map(
         (opt) => `
       <div class="folder-dropdown-item" id="${opt.id}">
-        <span style="flex-grow:1;text-align:right;">${opt.label}</span>
+        <span style="flex-grow:1;text-align:${_DIR.align};">${opt.label}</span>
         <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="${opt.icon}"/></svg>
       </div>
     `,
@@ -1133,7 +1196,7 @@ function injectFolderOptionIntoNativeMenu(menuContainer) {
 
   item.innerHTML = `
     <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24" style="flex-shrink:0;"><path d="${iconPath}"/></svg>
-    <span style="flex-grow:1;text-align:right;direction:rtl;">${isFromFolder ? "הסר מהתיקייה שלי" : "הוסף לתיקייה שלי"}</span>`;
+    <span style="flex-grow:1;text-align:${_DIR.align};direction:${_isRTL ? "rtl" : "ltr"};">${isFromFolder ? T.removeFromMyFolder : T.addToMyFolder}</span>`;
 
   item.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -1210,10 +1273,10 @@ function renderFolders() {
           folder.notebooks.length > 0
             ? `
           <div class="folder-chat-item nblm-table-header" style="cursor:default; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:4px; margin-bottom:8px; display:flex;">
-            <div style="flex:1.5; color:#a8c7fa; font-size:12px; font-weight:500; text-align:right;">שם המחברת</div>
-            <div style="flex:1; color:#a8c7fa; font-size:12px; font-weight:500; text-align:right; padding-right:8px;">מקורות</div>
-            <div style="flex:1; color:#a8c7fa; font-size:12px; font-weight:500; text-align:right; padding-right:8px;">תאריך יצירה</div>
-            <div style="flex:0.8; color:#a8c7fa; font-size:12px; font-weight:500; text-align:right; padding-right:8px;">תפקיד</div>
+            <div style="flex:1.5; color:#a8c7fa; font-size:12px; font-weight:500; text-align:${_DIR.align};">${T.colTitle}</div>
+            <div style="flex:1; color:#a8c7fa; font-size:12px; font-weight:500; text-align:${_DIR.align}; padding-right:8px;">${T.colSources}</div>
+            <div style="flex:1; color:#a8c7fa; font-size:12px; font-weight:500; text-align:${_DIR.align}; padding-right:8px;">${T.colDate}</div>
+            <div style="flex:0.8; color:#a8c7fa; font-size:12px; font-weight:500; text-align:${_DIR.align}; padding-right:8px;">${T.colRole}</div>
             <div style="width:24px;"></div> <!-- spacer -->
           </div>
         `
@@ -1225,17 +1288,17 @@ function renderFolders() {
           <div class="folder-chat-item" style="display:flex;">
             <div class="nblm-nb-title-btn"
                  data-title="${nb.title}"
-                 style="flex:1.5; text-align:right; font-size:13px; cursor:pointer; color:#e3e3e3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" 
+                 style="flex:1.5; text-align:${_DIR.align}; font-size:13px; cursor:pointer; color:#e3e3e3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" 
                  title="${nb.title}">
               ${nb.title}
             </div>
-            <div style="flex:1; font-size:13px; color:#c4c7c5; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:8px;">
+            <div style="flex:1; font-size:13px; color:#c4c7c5; text-align:${_DIR.align}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:8px;">
               ${nb.sources || "-"}
             </div>
-            <div style="flex:1; font-size:13px; color:#c4c7c5; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:8px;">
+            <div style="flex:1; font-size:13px; color:#c4c7c5; text-align:${_DIR.align}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:8px;">
               ${nb.date || "-"}
             </div>
-            <div style="flex:0.8; font-size:13px; color:#c4c7c5; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:8px;">
+            <div style="flex:0.8; font-size:13px; color:#c4c7c5; text-align:${_DIR.align}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:8px;">
               ${nb.role || "-"}
             </div>
             <div class="folder-chat-menu-btn"
@@ -1389,12 +1452,12 @@ function injectFoldersUI() {
     <div id="nblm-folders-header" class="${isMainSectionOpen ? "is-open" : ""}">
       <div id="nblm-folders-title-row">
         <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24" style="color:#a8c7fa;flex-shrink:0;"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
-        <h3 id="nblm-folders-title">התיקיות שלי</h3>
+        <h3 id="nblm-folders-title">${T.myFolders}</h3>
       </div>
       <div id="nblm-folders-header-actions">
         <button id="nblm-add-folder-btn">
           <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-          תיקייה חדשה
+          ${T.newFolder}
         </button>
         <div id="nblm-folders-arrow">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
