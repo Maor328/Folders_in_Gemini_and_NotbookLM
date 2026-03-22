@@ -10,7 +10,7 @@ Gemini Folders Preview:
 
 NotebookLM Folders Preview:
 
-![NotebookLM Folders Extension Preview](previewNoteBook.png)
+![NotebookLM Folders Extension Preview](previewNotebook.png)
 
 ## ✨ Features
 
