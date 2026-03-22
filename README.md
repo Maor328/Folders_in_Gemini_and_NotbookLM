@@ -1,8 +1,8 @@
-## 📁 Gemini & NotebookLM Folders
+# 📁 Gemini & NotebookLM Folders
 
 Gemini & NotebookLM Folders is a lightweight, productivity-focused browser extension designed to provide hierarchical organization for Google Gemini conversational histories and Google NotebookLM projects. This extension integrates a custom, color-coded folder system directly into the native Google Material Design interface.
 
-# ✨ Features
+## ✨ Features
 
 Seamless Native Integration: The UI is designed to blend perfectly with Google's native interfaces, interacting safely with Angular Material (CDK) DOM elements to maintain stability during site updates.
 
@@ -14,7 +14,7 @@ Visual Organization: Assign custom colors to individual folders for instant visu
 
 Safe & Private: All data is persisted locally using the chrome.storage.local API. The extension operates completely client-side with no external server dependencies, data tracking, or data collection.
 
-# 🛠 Technical Details
+## 🛠 Technical Details
 
 Platform: Chrome Extension Manifest V3.
 
@@ -24,7 +24,7 @@ Permissions: storage (for local data persistence).
 
 Architecture: Dual content scripts optimized specifically for Gemini and NotebookLM DOM structures.
 
-# 🚀 Installation (Developer Mode)
+## 🚀 Installation (Developer Mode)
 
 Currently, the extension is available for manual installation only. Follow these steps to get started:
 
@@ -40,7 +40,7 @@ Select Directory: Select the directory containing the extension files (where man
 
 Refresh & Use: The extension is now active! Refresh your Gemini or NotebookLM pages to initialize the interface.
 
-# 📖 Usage Guide
+## 📖 Usage Guide
 
 Creating Folders: Use the "+ Add Folder" button located in the newly injected sidebar panel.
 
@@ -50,10 +50,10 @@ Managing Folders: Hover over a folder and use its context menu (⋮) to pin, ren
 
 Managing Folder Items: Items inside a folder have their own context menu (⋮), allowing for native actions (Share, Rename, Delete) or the "Remove from folder" action.
 
-# 🤝 Contributing
+## 🤝 Contributing
 
 Contributions are welcome! Please submit feature requests or bug reports via the GitHub issues page.
 
-# ⚖ License
+## ⚖ License
 
 This project is licensed under the MIT License.
