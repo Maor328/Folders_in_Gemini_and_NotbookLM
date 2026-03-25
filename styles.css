@@ -497,6 +497,7 @@ body.gemini-action-in-progress .cdk-overlay-backdrop {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   transition: background-color 0.2s;
   gap: 12px;
+  background: rgba(0, 0, 0, 0.1);
 }
 
 #nblm-folders-header:hover {
@@ -642,6 +643,12 @@ body.gemini-action-in-progress .cdk-overlay-backdrop {
   padding: 8px 12px;
   margin: 1px 0;
   transition: background 0.15s;
+  background: rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+#nblm-custom-folders .folder-chat-item:last-child {
+  border-bottom: none;
 }
 
 #nblm-custom-folders .folder-chat-item:hover {
