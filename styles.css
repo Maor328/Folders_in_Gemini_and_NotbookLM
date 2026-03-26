@@ -762,3 +762,245 @@ body.gf-ltr .cdk-overlay-container {
 body.gf-ltr #nblm-custom-folders {
   direction: ltr;
 }
+
+/* ============================================================
+   LIGHT MODE OVERRIDES
+   Applied automatically when the OS / browser is in light mode.
+   Uses !important throughout to guarantee overriding the dark
+   defaults above.
+   ============================================================ */
+
+@media (prefers-color-scheme: light) {
+  /* ── Shared: folder item row ─────────────────────────────── */
+  .custom-folder-item:hover {
+    background-color: rgba(0, 0, 0, 0.06) !important;
+  }
+
+  .folder-name {
+    color: #1f1f1f !important;
+  }
+
+  .folder-arrow-svg {
+    color: #444746 !important;
+  }
+
+  .folder-menu-btn,
+  .folder-chat-menu-btn {
+    color: #555 !important;
+  }
+
+  .folder-menu-btn:hover,
+  .folder-chat-menu-btn:hover {
+    background-color: rgba(0, 0, 0, 0.1) !important;
+  }
+
+  /* ── Shared: chat / notebook item row ───────────────────── */
+  .folder-chat-item:hover {
+    background-color: rgba(0, 0, 0, 0.05) !important;
+  }
+
+  .chat-title-btn {
+    color: #1f1f1f !important;
+  }
+
+  /* ── Shared: dropdown menus (folder actions + folder picker) */
+  .folder-dropdown {
+    background: #ffffff !important;
+    border: 1px solid rgba(0, 0, 0, 0.12) !important;
+    box-shadow:
+      0 5px 5px -3px rgba(0, 0, 0, 0.1),
+      0 8px 10px 1px rgba(0, 0, 0, 0.07),
+      0 3px 14px 2px rgba(0, 0, 0, 0.06) !important;
+  }
+
+  .folder-dropdown-item {
+    color: #1f1f1f !important;
+  }
+
+  .folder-dropdown-item svg {
+    color: #444746 !important;
+  }
+
+  .folder-dropdown-item:hover {
+    background: rgba(0, 0, 0, 0.06) !important;
+  }
+
+  /* ── Shared: modal card ──────────────────────────────────── */
+  .folder-modal {
+    background: #ffffff !important;
+    box-shadow:
+      0 24px 48px rgba(0, 0, 0, 0.18),
+      0 0 0 1px rgba(0, 0, 0, 0.07) !important;
+  }
+
+  .folder-modal-close-x {
+    color: #444746 !important;
+    background: rgba(0, 0, 0, 0.05) !important;
+  }
+
+  .folder-modal-close-x:hover {
+    background: rgba(0, 0, 0, 0.1) !important;
+  }
+
+  /* Title — explicit !important to override the dark #e3e3e3 default */
+  .folder-modal h2 {
+    color: #1f1f1f !important;
+  }
+
+  .folder-modal p {
+    color: #5f6368 !important;
+  }
+
+  /* Floating label — background must match the modal card */
+  .folder-modal label {
+    color: #1a73e8 !important;
+    background: #ffffff !important;
+  }
+
+  .folder-modal input {
+    background: rgba(0, 0, 0, 0.04) !important;
+    border-color: rgba(0, 0, 0, 0.2) !important;
+    color: #1f1f1f !important;
+  }
+
+  .folder-modal input::placeholder {
+    color: #9aa0a6 !important;
+  }
+
+  .folder-modal input:focus {
+    border-color: #1a73e8 !important;
+    background: rgba(26, 115, 232, 0.04) !important;
+  }
+
+  .cancel-btn-plain {
+    color: #1a73e8 !important;
+    border-color: rgba(0, 0, 0, 0.2) !important;
+  }
+
+  .cancel-btn-plain:hover {
+    background: rgba(26, 115, 232, 0.08) !important;
+    border-color: rgba(26, 115, 232, 0.4) !important;
+  }
+
+  .gemini-renaming-chat {
+    outline-color: rgba(26, 115, 232, 0.4) !important;
+  }
+
+  /* ── Gemini: site-specific ───────────────────────────────── */
+  #gemini-custom-folders {
+    border-top-color: rgba(0, 0, 0, 0.12) !important;
+    border-bottom-color: rgba(0, 0, 0, 0.12) !important;
+  }
+
+  #main-folders-header:hover {
+    background-color: rgba(0, 0, 0, 0.06) !important;
+  }
+
+  #main-folders-header h3 {
+    color: #1f1f1f !important;
+  }
+
+  #add-folder-btn {
+    background-color: rgba(0, 0, 0, 0.05) !important;
+    border-color: rgba(0, 0, 0, 0.15) !important;
+    color: #1f1f1f !important;
+  }
+
+  #add-folder-btn:hover {
+    background-color: rgba(0, 0, 0, 0.1) !important;
+    border-color: rgba(0, 0, 0, 0.25) !important;
+  }
+
+  #main-folders-arrow {
+    color: #444746 !important;
+  }
+
+  /* ── NotebookLM: site-specific ───────────────────────────── */
+  #nblm-custom-folders {
+    border-top-color: rgba(0, 0, 0, 0.12) !important;
+  }
+
+  #nblm-folders-header {
+    background: rgba(0, 0, 0, 0.04) !important;
+    border-bottom-color: rgba(0, 0, 0, 0.08) !important;
+  }
+
+  #nblm-folders-header:hover {
+    background-color: rgba(0, 0, 0, 0.07) !important;
+  }
+
+  #nblm-folders-header.is-open {
+    border-bottom-color: rgba(0, 0, 0, 0.1) !important;
+  }
+
+  #nblm-folders-title {
+    color: #1f1f1f !important;
+  }
+
+  #nblm-add-folder-btn {
+    background: rgba(26, 115, 232, 0.1) !important;
+    border-color: rgba(26, 115, 232, 0.3) !important;
+    color: #1a73e8 !important;
+  }
+
+  #nblm-add-folder-btn:hover {
+    background: rgba(26, 115, 232, 0.18) !important;
+    border-color: rgba(26, 115, 232, 0.5) !important;
+  }
+
+  #nblm-folders-arrow {
+    color: #5f6368 !important;
+  }
+
+  #nblm-folders-arrow:hover {
+    background: rgba(0, 0, 0, 0.06) !important;
+  }
+
+  #nblm-custom-folders .custom-folder-item {
+    background: rgba(0, 0, 0, 0.02) !important;
+    border-color: transparent !important;
+  }
+
+  #nblm-custom-folders .custom-folder-item:hover {
+    background: rgba(0, 0, 0, 0.06) !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+  }
+
+  #nblm-custom-folders .custom-folder-item.is-open {
+    background: rgba(26, 115, 232, 0.06) !important;
+    border-color: rgba(26, 115, 232, 0.2) !important;
+  }
+
+  #nblm-custom-folders .folder-name {
+    color: #1f1f1f !important;
+  }
+
+  #nblm-custom-folders .nblm-table-header,
+  #nblm-custom-folders .nblm-table-header * {
+    border-bottom-color: rgba(0, 0, 0, 0.1) !important;
+    color: #5f6368 !important; /* צבע אפור כהה לכותרות העמודות */
+  }
+
+  #nblm-custom-folders .folder-chat-item,
+  #nblm-custom-folders .folder-chat-item * {
+    color: #1f1f1f !important; /* צבע טקסט כהה לכל השורות הפנימיות */
+  }
+
+  #nblm-custom-folders .folder-chat-item {
+    background: rgba(0, 0, 0, 0.03) !important;
+    border-bottom-color: rgba(0, 0, 0, 0.06) !important;
+  }
+
+  #nblm-custom-folders .folder-chat-item:hover {
+    background: rgba(0, 0, 0, 0.07) !important;
+  }
+
+  /* "Add to / Remove from folder" in NLM's native menu */
+  .nblm-folder-option {
+    color: #1f1f1f !important;
+  }
+
+  .nblm-folder-option:hover {
+    background-color: rgba(0, 0, 0, 0.06) !important;
+  }
+}
